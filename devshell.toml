@@ -16,6 +16,12 @@ name="setup-path"
 command="export PATH=$PATH:$HOME/.cargo/bin"
 help="Ensures wkg is visible as executable"
 category="WebAssembly"
+[[commands]]
+package="wasmtime"
+name="wasmtime"
+help="Standalone JIT-style runtime for WebAssembly, using Cranelift"
+category="WebAssembly"
+
 
 # GO
 [[commands]]
