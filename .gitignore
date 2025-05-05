@@ -1,0 +1,9 @@
+target
+temp
+*.wasm
+.idea
+bin/
+__pycache__
+tested-operators/
+.direnv/
+.envrc
