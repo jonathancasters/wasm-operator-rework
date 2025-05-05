@@ -1,0 +1,108 @@
+# https://numtide.github.io/devshell
+
+# WebAssembly
+[[commands]]
+package="wasm-tools"
+name="wasm-tools"
+help="Cli tool to work with wasm modules and components"
+category="WebAssembly"
+[[commands]]
+name="install-wkg"
+command="cargo install wkg"
+help="Installs the wkg (wasm-pkg-tool) package with cargo"
+category="WebAssembly"
+[[commands]]
+name="setup-path"
+command="export PATH=$PATH:$HOME/.cargo/bin"
+help="Ensures wkg is visible as executable"
+category="WebAssembly"
+
+# GO
+[[commands]]
+package="tinygo"
+name="tinygo"
+help="Alternative go compiler used to compile to wasip2"
+category="Go"
+[[commands]]
+package="go"
+name="go"
+help="Default go compiler"
+category="Go"
+[[commands]]
+name="goFormat"
+command="go fmt ."
+help="format the Go package present in working directory" 
+category="Go"
+
+# RUST
+[[commands]]
+package="rustup"
+name="rustup"
+help="Rust toolchain installer"
+category="Rust"
+[[commands]]
+package="cargo-cross"
+name="cross"
+help="Zero setup cross compilation and cross testing"
+category="Rust"
+# Set the NIX_STORE variable such that cargo-cross can find cargo when using nix
+# Cf: https://github.com/cross-rs/cross/pull/524/files
+[[env]]
+name="NIX_STORE"
+value="/nix/store/"
+[[commands]]
+name="rf"
+command="cargo fmt"
+help="Format the rust code in the current working directory"
+category="Rust"
+
+# PYTHON
+[[commands]]
+package="python313"
+name="python"
+help="High-level dynamically-typed programming language"
+category="Python"
+[[commands]]
+package="python313Packages.pip"
+name="pip3"
+help="Python package manager"
+category="Python"
+[[commands]]
+package="ruff"
+name="ruff"
+command="ruff format"
+help="tool for formatting Python code according to style guidelines"
+category="Python"
+
+# KUBERNETES
+[[commands]]
+package="kind"
+name="kind"
+help="Kubernetes IN Docker"
+category="Kubernetes"
+[[commands]]
+package="kubectl"
+name="kubectl"
+help="Kubernetes cli"
+category="Kubernetes"
+
+
+# UTILITY
+[[commands]]
+package="tree"
+name="tree"
+help="Command to produce a depth indented directory listing"
+[[commands]]
+package="shfmt"
+name="shfmt"
+help="Shell parser and formatter" 
+[[commands]]
+name="marklint"
+command="markdownlint-cli2 '**/*.md' '#pkg/kube-rs'"
+help="Shell parser and formatter" 
+
+[devshell]
+packages = [
+	# Add packages here if you want them included, but don't want it in the overview
+	"markdownlint-cli2"
+]
