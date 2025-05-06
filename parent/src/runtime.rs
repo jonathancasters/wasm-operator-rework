@@ -1,12 +1,12 @@
+use crate::config::metadata::WasmComponentMetadata;
+use tracing::{error, info};
 use wasmtime::{
-    component::{Component, Linker, ResourceTable},
     Engine, Store,
+    component::{Component, Linker, ResourceTable},
 };
 use wasmtime_wasi::{
-    bindings::Command, WasiCtx, WasiCtxBuilder, WasiView, IoView, add_to_linker_async,
+    IoView, WasiCtx, WasiCtxBuilder, WasiView, add_to_linker_async, bindings::Command,
 };
-use tracing::{info, error};
-use crate::config::metadata::WasmComponentMetadata;
 
 pub struct ComponentCtx {
     pub wasi_ctx: WasiCtx,
