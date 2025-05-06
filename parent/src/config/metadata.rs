@@ -20,7 +20,7 @@ pub struct WasmComponentMetadata {
 }
 
 impl WasmComponentMetadata {
-    /// Load module metadata from a YAML file
+    /// Load component metadata from a YAML file
     pub fn load_from_yaml(path: &PathBuf) -> Result<Vec<WasmComponentMetadata>> {
         let contents = fs::read_to_string(path)?;
 
