@@ -48,8 +48,7 @@ fn setup_logging() {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(tracing::Level::INFO)
         .finish();
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 }
 
 fn parse_args() -> anyhow::Result<PathBuf> {
@@ -59,4 +58,3 @@ fn parse_args() -> anyhow::Result<PathBuf> {
     }
     Ok(PathBuf::from(&args[1]))
 }
-

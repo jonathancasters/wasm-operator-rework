@@ -26,15 +26,14 @@ impl WasmComponentMetadata {
 
         contents
             .split("\n---")
-            .filter_map(|yaml_doc| {
-                match serde_yml::from_str::<WasmComponentMetadata>(yaml_doc) {
+            .filter_map(
+                |yaml_doc| match serde_yml::from_str::<WasmComponentMetadata>(yaml_doc) {
                     Err(err) if err.to_string().contains("EOF while parsing a value") => None,
-                    result => Some(
-                        result.map_err(|e| anyhow::anyhow!("Failed to parse module: {}", e)),
-                    ),
-                }
-            })
+                    result => {
+                        Some(result.map_err(|e| anyhow::anyhow!("Failed to parse module: {}", e)))
+                    }
+                },
+            )
             .collect()
     }
 }
-
