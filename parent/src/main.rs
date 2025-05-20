@@ -1,13 +1,13 @@
 mod config;
 mod runtime;
 
+use std::sync::Arc;
 use std::{env, path::PathBuf};
 
 use config::metadata::WasmComponentMetadata;
-use runtime::run_component;
-use tracing::{error, info};
+use runtime::wasm::WasmRuntime;
+use tracing::{info};
 use tracing_subscriber::FmtSubscriber;
-use wasmtime::{Config, Engine, OptLevel};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -21,25 +21,11 @@ async fn main() -> anyhow::Result<()> {
         info!(" - {}", metadata.name);
     }
 
-    let mut config = Config::new();
-    config.async_support(true);
-    config.cranelift_opt_level(OptLevel::SpeedAndSize);
-    let engine = Engine::new(&config)?;
+    let runtime = Arc::new(WasmRuntime::new()?);
+    runtime.run_components(components_metadata).await?;
 
-    let mut handles = vec![];
-    for metadata in components_metadata {
-        let engine = engine.clone();
-        let handle = tokio::spawn(async move {
-            if let Err(e) = run_component(engine, metadata).await {
-                error!("Module failed: {:?}", e);
-            }
-        });
-        handles.push(handle);
-    }
-
-    for handle in handles {
-        handle.await?;
-    }
+    info!("All components finished successfully.");
+    info!("Exiting...");
 
     Ok(())
 }
