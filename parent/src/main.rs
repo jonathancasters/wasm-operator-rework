@@ -1,14 +1,21 @@
 mod config;
 mod runtime;
+mod kubernetes;
 
 use std::sync::Arc;
 use std::{env, path::PathBuf};
 
 use config::metadata::WasmComponentMetadata;
-use kube::Config;
+use hyper::{
+    Request, Response,
+    body::{Bytes},
+};
+use kubernetes::HttpResponseMeta;
+use reqwest::Response;
 use runtime::wasm::WasmRuntime;
 use tracing::{info, debug};
 use tracing_subscriber::FmtSubscriber;
+use crate::kubernetes::KubernetesService;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -16,18 +23,36 @@ async fn main() -> anyhow::Result<()> {
 
     setup_logging(debug);
 
-    let components_metadata = WasmComponentMetadata::load_from_yaml(&config_path)?;
+    let kube_service = KubernetesService::new().await?;
 
-    info!("Loaded {} WASM component(s):", components_metadata.len());
-    for metadata in &components_metadata {
-        info!(" - {}", metadata.name);
-    }
+    // TODO: remove
+    let req: Request<Bytes> = hyper::Request::builder()
+        .method("GET")
+        .uri("https://kubernetes.default.svc/api/v1/namespaces/default/pods")
+        .header("Accept", "application/json")
+        .body(Bytes::new())
+        .expect("Failed to build request");
 
-    let runtime = Arc::new(WasmRuntime::new()?);
-    runtime.run_components(components_metadata).await?;
+    let (meta, body) : (HttpResponseMeta, Response<Bytes>) = kube_service.send_request(req).await?;
+    debug!("Status: {}", meta.status_code);
+    debug!("Headers: {:?}", meta.headers);
+    let body_bytes = body.into().collect().await?.to_vec();
+    debug!("Body: {}", String::from_utf8_lossy(&body_bytes));
+    // End of TODO
+    
 
-    info!("All components finished successfully.");
-    info!("Exiting...");
+    // let components_metadata = WasmComponentMetadata::load_from_yaml(&config_path)?;
+
+    // info!("Loaded {} WASM component(s):", components_metadata.len());
+    // for metadata in &components_metadata {
+    //     info!(" - {}", metadata.name);
+    // }
+
+    // let runtime = Arc::new(WasmRuntime::new()?);
+    // runtime.run_components(components_metadata).await?;
+
+    // info!("All components finished successfully.");
+    // info!("Exiting...");
 
     Ok(())
 }
