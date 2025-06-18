@@ -110,5 +110,13 @@ help="Shell parser and formatter"
 [devshell]
 packages = [
 	# Add packages here if you want them included, but don't want it in the overview
-	"markdownlint-cli2"
+	"markdownlint-cli2",
+	"openssl",
+	"openssl.dev",
+	"pkg-config"
 ]
+
+# Needed to be able to build the application with cargo (https)
+[[env]]
+name="PKG_CONFIG_PATH"
+eval="$DEVSHELL_DIR/lib/pkgconfig"
