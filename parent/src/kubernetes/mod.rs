@@ -1,24 +1,16 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use http::{HeaderMap, StatusCode, Uri};
-use hyper::{
-    Request
-};
+use hyper::{Request, body::Body};
 use hyper_util::rt::TokioExecutor;
 use kube::client::ConfigExt;
 use kube::{Client, Config};
-use kube::core::response::Status;
 use serde::de::DeserializeOwned;
+use std::fmt::Debug;
 use tower::BoxError;
-use tower::{ServiceBuilder};
-
-#[derive(Debug)]
-pub struct HttpResponseMeta {
-    pub status_code: StatusCode,
-    pub headers: HeaderMap,
-}
+use tower::ServiceBuilder;
 
 pub struct KubernetesService {
-    base_uri: Uri,
+    pub base_uri: Uri,
     inner: Client,
 }
 
@@ -41,43 +33,43 @@ impl KubernetesService {
         })
     }
 
-    pub async fn send_request<T>(&mut self, request: http::Request<Vec<u8>>) -> Result<T>
+    /// Send a request to the Kubernetes API and deserialize the response.
+    ///
+    /// This function can handle any kind of HTTP request with any data.
+    /// The response will be deserialized into the specified type.
+    pub async fn send_request<B, T>(&self, request: Request<B>) -> Result<T>
     where
+        B: Body + Send + 'static,
+        B::Data: Send,
+        B::Error: Into<BoxError>,
         T: DeserializeOwned,
     {
+        // Convert the request body to Vec<u8> as required by kube-rs
         let (parts, body) = request.into_parts();
-        let request = Request::from_parts(parts,  Full::new(Bytes::from(body.unwrap().to_owned())));
 
-        // Send the request using the inner service
-        let response = self
+        // Collect the body into bytes
+        let body_bytes = match http_body_util::BodyExt::collect(body).await {
+            Ok(collected) => collected.to_bytes(),
+            Err(_) => return Err(anyhow::anyhow!("Failed to collect request body")),
+        };
+
+        // Create a new request with Vec<u8> body for kube-rs
+        let request = Request::from_parts(parts, body_bytes.to_vec());
+
+        // Send the request using the inner kube client
+        // The kube client handles status code checking and deserialization
+        let result: T = self
             .inner
             .request(request)
             .await
             .context("Failed to send request to Kubernetes API")?;
 
-        let status = response.status();
-        let body_bytes = to_bytes(response.into_body())
-            .await
-            .context("Failed to read response body")?;
-
-        if !status.is_success() {
-            // Try decoding a Kubernetes status object (for errors like NotFound, Unauthorized, etc.)
-            if let Ok(status_obj) = serde_json::from_slice::<Status>(&body_bytes) {
-                anyhow::bail!("Kubernetes API error: {:?}", status_obj);
-            } else {
-                anyhow::bail!("Request failed with status {}: {:?}", status, body_bytes);
-            }
-        }
-
-        // Deserialize the successful response into the expected type
-        let parsed: T =
-            serde_json::from_slice(&body_bytes).context("Failed to deserialize response body")?;
-
-        Ok(parsed)
+        Ok(result)
     }
 
-    fn generate_url(base_uri: &Uri, path_and_query: &http::uri::PathAndQuery) -> Uri {
-        let mut parts = base_uri.clone().into_parts();
+    /// Generate a full URI from the base URI and a path and query.
+    pub fn generate_url(&self, path_and_query: &http::uri::PathAndQuery) -> Uri {
+        let mut parts = self.base_uri.clone().into_parts();
         parts.path_and_query = Some(path_and_query.clone());
         Uri::from_parts(parts).expect("invalid URI construction")
     }
