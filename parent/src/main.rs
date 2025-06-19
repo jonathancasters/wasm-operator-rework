@@ -1,58 +1,36 @@
 mod config;
-mod runtime;
 mod kubernetes;
+mod runtime;
 
 use std::sync::Arc;
 use std::{env, path::PathBuf};
 
 use config::metadata::WasmComponentMetadata;
-use hyper::{
-    Request, Response,
-    body::{Bytes},
-};
-use kubernetes::HttpResponseMeta;
-use reqwest::Response;
 use runtime::wasm::WasmRuntime;
-use tracing::{info, debug};
+use tracing::{debug, info};
 use tracing_subscriber::FmtSubscriber;
-use crate::kubernetes::KubernetesService;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     let (config_path, debug) = parse_args()?;
 
     setup_logging(debug);
+    let components_metadata = WasmComponentMetadata::load_from_yaml(&config_path)?;
 
-    let kube_service = KubernetesService::new().await?;
+    info!("Loaded {} WASM component(s):", components_metadata.len());
+    for metadata in &components_metadata {
+        info!(" - {}", metadata.name);
+    }
 
-    // TODO: remove
-    let req: Request<Bytes> = hyper::Request::builder()
-        .method("GET")
-        .uri("https://kubernetes.default.svc/api/v1/namespaces/default/pods")
-        .header("Accept", "application/json")
-        .body(Bytes::new())
-        .expect("Failed to build request");
+    let runtime = Arc::new(WasmRuntime::new()?);
 
-    let (meta, body) : (HttpResponseMeta, Response<Bytes>) = kube_service.send_request(req).await?;
-    debug!("Status: {}", meta.status_code);
-    debug!("Headers: {:?}", meta.headers);
-    let body_bytes = body.into().collect().await?.to_vec();
-    debug!("Body: {}", String::from_utf8_lossy(&body_bytes));
-    // End of TODO
-    
+    // Create a tokio runtime and run the async code
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(async {
+        runtime.run_components(components_metadata).await
+    })?;
 
-    // let components_metadata = WasmComponentMetadata::load_from_yaml(&config_path)?;
-
-    // info!("Loaded {} WASM component(s):", components_metadata.len());
-    // for metadata in &components_metadata {
-    //     info!(" - {}", metadata.name);
-    // }
-
-    // let runtime = Arc::new(WasmRuntime::new()?);
-    // runtime.run_components(components_metadata).await?;
-
-    // info!("All components finished successfully.");
-    // info!("Exiting...");
+    info!("All components finished successfully.");
+    info!("Exiting...");
 
     Ok(())
 }
@@ -64,10 +42,10 @@ fn setup_logging(debug: bool) {
         tracing::Level::INFO
     };
 
-    tracing::subscriber::set_global_default(FmtSubscriber::builder()
-        .with_max_level(level)
-        .finish())
-        .expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(
+        FmtSubscriber::builder().with_max_level(level).finish(),
+    )
+    .expect("setting default subscriber failed");
 
     if debug {
         debug!("Debug logging enabled.");
