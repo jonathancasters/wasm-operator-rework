@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use http::{HeaderMap, StatusCode, Uri};
-use hyper::{Request, body::Body};
+use http::Uri;
+use hyper::{body::Body, Request};
 use hyper_util::rt::TokioExecutor;
 use kube::client::ConfigExt;
 use kube::{Client, Config};
