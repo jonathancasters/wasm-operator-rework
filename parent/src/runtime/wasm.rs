@@ -6,7 +6,7 @@ use wasmtime::{
     Engine, Store,
     component::{Component, Linker, ResourceTable},
 };
-use wasmtime_wasi::{
+use wasmtime_wasi::p2::{
     IoView, WasiCtx, WasiCtxBuilder, WasiView, add_to_linker_async, bindings::Command,
 };
 
@@ -94,6 +94,11 @@ impl WasmRuntime {
 
         let mut linker = Linker::new(&engine);
         add_to_linker_async(&mut linker)?;
+
+        // TODO!
+        // linker.root().func_wrap_async(
+        //     "send-request",
+        // )?;
 
         let command = Command::instantiate_async(&mut store, &component, &linker).await?;
         let result = command.wasi_cli_run().call_run(&mut store).await;
