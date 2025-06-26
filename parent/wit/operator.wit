@@ -1,4 +1,4 @@
-package wasm-operator:main
+package wasm-operator:operator;
 
 interface types {
     type async-id = u64;
@@ -13,7 +13,7 @@ interface http {
         patch,
     }
 
-    record header{
+    record header {
         name: string,
         value: string,
     }
@@ -21,13 +21,13 @@ interface http {
     record request {
         method: method,
         uri: string,
-        headers: list<Header>,
+        headers: list<header>,
         body: list<u8>, // Body as raw bytes
     }
 
     record response {
         status: u16,
-        headers: list<Header>,
+        headers: list<header>,
         body: list<u8>, // Body as raw bytes
     }
 }
@@ -37,18 +37,17 @@ interface parent-api {
     use http.{request};
     use types.{async-id};
 
-    send-request: func(req: request) -> async-id;
+    send-request: func(req: request) -> result<async-id, string>;
 }
 
 interface child-api {
     use http.{response};
     use types.{async-id};
 
-    handle-response: func(id: async-id, response: http-response);
+    handle-response: func(id: async-id, res: response);
 }
 
 world operator {
-    import parent-api
-    export child-api
+    import parent-api;
+    export child-api;
 }
-

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::config::metadata::WasmComponentMetadata;
 use tracing::{error, info};
+use wasmtime::component::{HasSelf, bindgen};
 use wasmtime::{
     Engine, Store,
     component::{Component, Linker, ResourceTable},
@@ -10,9 +11,27 @@ use wasmtime_wasi::p2::{
     IoView, WasiCtx, WasiCtxBuilder, WasiView, add_to_linker_async, bindings::Command,
 };
 
+// Generate bindings for the wit world "operator"
+bindgen!({
+    world: "operator",
+    path: "wit/operator.wit",
+    async: true,
+});
+
 pub struct ComponentCtx {
     pub wasi_ctx: WasiCtx,
     pub resource_table: ResourceTable,
+}
+
+impl wasm_operator::operator::parent_api::Host for ComponentCtx {
+    async fn send_request(
+        &mut self,
+        request: wasm_operator::operator::http::Request,
+    ) -> wasmtime::Result<wasm_operator::operator::types::AsyncId, String> {
+        info!("Host received request from Wasm component: {:?}", request);
+        // TODO: integrate with actual KubernetesService
+        Ok(1)
+    }
 }
 
 impl IoView for ComponentCtx {
@@ -46,7 +65,6 @@ impl WasmRuntime {
         self: Arc<Self>,
         components_metadata: Vec<WasmComponentMetadata>,
     ) -> anyhow::Result<()> {
-
         let mut handles = vec![];
 
         for metadata in components_metadata {
@@ -95,10 +113,12 @@ impl WasmRuntime {
         let mut linker = Linker::new(&engine);
         add_to_linker_async(&mut linker)?;
 
-        // TODO!
-        // linker.root().func_wrap_async(
-        //     "send-request",
-        // )?;
+        // We explicitly provide the generic arguments to `add_to_linker`.
+        // 1. The first argument `_` is inferred as `ComponentCtx`, our store's state.
+        // 2. `HasSelf<_>` tells the linker that our state itself implements the `Host` trait.
+        wasm_operator::operator::parent_api::add_to_linker::<_, HasSelf<_>>(&mut linker, |ctx| {
+            ctx
+        })?;
 
         let command = Command::instantiate_async(&mut store, &component, &linker).await?;
         let result = command.wasi_cli_run().call_run(&mut store).await;
