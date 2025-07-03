@@ -4,7 +4,7 @@ set -euo pipefail
 
 CLUSTER_NAME="wasm-test-cluster"
 CONFIG_PATH="./test-data/empty-config.yaml"
-MANIFEST_PATH="../../parent/Cargo.toml"
+MANIFEST_PATH="../../../parent/Cargo.toml"
 
 cleanup() {
     echo "🧹 Cleaning up..."
