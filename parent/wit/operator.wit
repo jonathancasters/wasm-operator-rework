@@ -47,7 +47,13 @@ interface child-api {
     handle-response: func(id: async-id, res: response);
 }
 
+/**
+    The wasip2 target of TinyGo assumes that the component is targeting
+    wasi:cli/command@0.2.0 world (part of wasi:cli) so it requires the imports of wasi:cli/imports@0.2.0
+*/
 world operator {
+    include wasi:cli/imports@0.2.0;
+
     import parent-api;
     export child-api;
 }

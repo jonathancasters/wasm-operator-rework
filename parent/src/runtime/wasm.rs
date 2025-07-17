@@ -13,8 +13,6 @@ use wasmtime_wasi::p2::{
 
 // Generate bindings for the wit world "operator"
 bindgen!({
-    world: "operator",
-    path: "wit/operator.wit",
     async: true,
 });
 

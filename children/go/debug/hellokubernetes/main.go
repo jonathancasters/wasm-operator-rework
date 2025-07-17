@@ -1,30 +1,43 @@
-
 package main
 
 import (
 	"fmt"
-	"example.com/hellokubernetes/wasm-operator/operator/child-api"
-	"example.com/hellokubernetes/wasm-operator/operator/parent-api"
-	"example.com/hellokubernetes/wasm-operator/operator/http"
 	"go.bytecodealliance.org/cm"
+	childapi "hellokubernetes/internal/wasm-operator/operator/child-api"
+	"hellokubernetes/internal/wasm-operator/operator/http"
+	parent "hellokubernetes/internal/wasm-operator/operator/parent-api"
+	"hellokubernetes/internal/wasm-operator/operator/types"
 )
 
 func main() {
+	// Create a request to get all pods from the Kubernetes API server.
 	request := http.Request{
-		Method: http.MethodGet,
-		URI:    "/api/v1/pods",
-		Headers: cm.ToList([]http.Header{{Name: "Accept", Value: "application/json"}}),
-		Body:    cm.ToList([]uint8{}),
+		Method:  http.MethodGet,
+		URI:     "/api/v1/pods",
+		Headers: cm.ToList([]http.Header{}),
+		Body:    cm.ToList([]byte{}),
 	}
-	
-	result := parentapi.SendRequest(request)
+
+	// Send the request to the parent.
+	result := parent.SendRequest(request)
 	if result.IsErr() {
-		fmt.Printf("Error sending request: %v", result.Err())
+		// Some form of logging. In WASI, this might go to stderr.
+		fmt.Printf("failed to send request: %s\n", *result.Err())
+		return
 	}
+
+	// The request was sent, the async ID is in result.OK().
+	// The host will call HandleResponse with the response.
+	fmt.Printf("Sent request with ID: %d\n", *result.OK())
 }
 
-//export HandleResponse
-func HandleResponse(response childapi.Response) {
-	fmt.Printf("child module received a response: %v", response)
+func init() {
+	childapi.Exports.HandleResponse = HandleResponse
 }
 
+// HandleResponse is called by the host when a response is ready.
+func HandleResponse(id types.AsyncID, res http.Response) {
+	fmt.Printf("Received response for ID: %d\n", id)
+	fmt.Printf("Status: %d\n", res.Status)
+	fmt.Printf("Body: %s\n", string(res.Body.Slice()))
+}
