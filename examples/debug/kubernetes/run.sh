@@ -45,4 +45,5 @@ echo "📡 Running Rust application via cargo..."
 KUBECONFIG="$(kind get kubeconfig-path --name=$CLUSTER_NAME 2>/dev/null)" \
 cargo run --manifest-path "$MANIFEST_PATH" -- --debug "$CONFIG_PATH"
 
+rm -rdf ./test-data
 echo "✅ Test complete."
