@@ -23,6 +23,15 @@ nix-shell
 This will launch a shell with all necessary dependencies and configurations
 applied.
 
+> [!NOTE]
+> If you encounter warnings about experimental features, create a
+> configuration file at `~/.config/nix/nix.conf` with this content:
+>
+> ```
+> experimental-features = nix-command flakes
+> ```
+> 
+
 ### Automatic Shell Activation (Optional)
 
 If you want the shell environment to activate automatically when you enter the
@@ -36,14 +45,7 @@ You can install `direnv` using the Nix package manager if you prefer:
 nix profile install nixpkgs#direnv
 ```
 
-> [!NOTE]
-> If you encounter warnings about experimental features, create a 
-> configuration file at `~/.config/nix/nix.conf` with this content:
->
-> ```
-> experimental-features = nix-command flakes
-> ```
->
+
 
 #### Steps
 
@@ -64,7 +66,7 @@ nix profile install nixpkgs#direnv
 2. Allow the `.envrc` file inside the repository directory:
 
    ```sh
-   cp .envrc.sample > .envrc
+   cp ./.envrc.sample > ./.envrc
    direnv allow
    ```
 
