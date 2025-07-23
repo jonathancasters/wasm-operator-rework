@@ -1,11 +1,11 @@
 name: "helloworld1"
-wasm: "../../children/go/debug/helloworld/target/wasm/hello.wasm"
+wasm: "../../../children/go/debug/helloworld/target/wasm/hello.wasm"
 env:
   - name: RUST_LOG
     value: "info"
 ---
 name: "helloworld2"
-wasm: "../../children/go/debug/helloworld/target/wasm/hello.wasm"
+wasm: "../../../children/go/debug/helloworld/target/wasm/hello.wasm"
 env:
   - name: RUST_LOG
     value: "info"

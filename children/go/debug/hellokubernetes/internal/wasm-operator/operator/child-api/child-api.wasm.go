@@ -17,3 +17,10 @@ func wasmexport_HandleResponse(id0 uint64, res0 uint32, res1 *http.Header, res2 
 	Exports.HandleResponse(id, res)
 	return
 }
+
+//go:wasmexport wasm-operator:operator/child-api#start
+//export wasm-operator:operator/child-api#start
+func wasmexport_Start() {
+	Exports.Start()
+	return
+}
