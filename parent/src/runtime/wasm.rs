@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::config::metadata::WasmComponentMetadata;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use wasmtime::component::{HasSelf, bindgen};
 use wasmtime::{
     Engine, Store,
@@ -11,17 +11,18 @@ use wasmtime_wasi::p2::{
     IoView, WasiCtx, WasiCtxBuilder, WasiView, add_to_linker_async, bindings::Command,
 };
 
-// Generate bindings for the wit world "operator"
-bindgen!({
-    async: true,
-});
+mod bindings {
+    wasmtime::component::bindgen!({
+        async: true
+    });
+}
 
 pub struct ComponentCtx {
     pub wasi_ctx: WasiCtx,
     pub resource_table: ResourceTable,
 }
 
-impl wasm_operator::operator::parent_api::Host for ComponentCtx {
+impl bindings::wasm_operator::operator::parent_api::Host for ComponentCtx {
     async fn send_request(
         &mut self,
         request: wasm_operator::operator::http::Request,
@@ -87,8 +88,10 @@ impl WasmRuntime {
 
         info!("Start component: {}", metadata.name);
 
+        debug!("Loading component from file: {}", metadata.wasm.display());
         let component = Component::from_file(&engine, &metadata.wasm)
             .map_err(|e| anyhow::anyhow!("Failed to load component '{}': {}", metadata.name, e))?;
+        debug!("Component loaded successfully: {}", metadata.name);
 
         let wasi_ctx = WasiCtxBuilder::new()
             .inherit_stdio()
@@ -110,30 +113,19 @@ impl WasmRuntime {
 
         let mut linker = Linker::new(&engine);
         add_to_linker_async(&mut linker)?;
+        wasm_operator::operator::parent_api::add_to_linker::<_, ComponentCtx>(
+            &mut linker,
+            |ctx| ctx,
+        )?;
 
-        // We explicitly provide the generic arguments to `add_to_linker`.
-        // 1. The first argument `_` is inferred as `ComponentCtx`, our store's state.
-        // 2. `HasSelf<_>` tells the linker that our state itself implements the `Host` trait.
-        wasm_operator::operator::parent_api::add_to_linker::<_, HasSelf<_>>(&mut linker, |ctx| {
-            ctx
-        })?;
+        debug!("Instantiating component: {}", metadata.name);
+        let (operator, _) = Operator::instantiate_async(&mut store, &component, &linker).await?;
+        debug!("Component instantiated successfully: {}", metadata.name);
 
-        let command = Command::instantiate_async(&mut store, &component, &linker).await?;
-        let result = command.wasi_cli_run().call_run(&mut store).await;
+        debug!("Running component: {}", metadata.name);
+        operator.child_api().call_start(&mut store).await?;
+        debug!("Component run finished: {}", metadata.name);
 
-        match result {
-            Ok(Ok(())) => {
-                info!("Module '{}' exited successfully", metadata.name);
-                Ok(())
-            }
-            Ok(Err(())) => {
-                error!("Module '{}' exited with failure", metadata.name);
-                std::process::exit(1);
-            }
-            Err(e) => Err(anyhow::anyhow!(
-                "Failed running command interface for '{}': {e}",
-                metadata.name
-            )),
-        }
+        Ok(())
     }
 }

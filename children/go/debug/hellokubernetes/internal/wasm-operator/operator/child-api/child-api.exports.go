@@ -8,4 +8,9 @@ var Exports struct {
 	//
 	//	handle-response: func(id: async-id, res: response)
 	HandleResponse func(id AsyncID, res Response)
+
+	// Start represents the caller-defined, exported function "start".
+	//
+	//	start: func()
+	Start func()
 }

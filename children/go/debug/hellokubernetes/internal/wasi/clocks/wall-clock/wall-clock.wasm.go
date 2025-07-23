@@ -2,12 +2,12 @@
 
 package wallclock
 
-// This file contains wasmimport and wasmexport declarations for "wasi:clocks@0.2.0".
+// This file contains wasmimport and wasmexport declarations for "wasi:clocks@0.2.6".
 
-//go:wasmimport wasi:clocks/wall-clock@0.2.0 now
+//go:wasmimport wasi:clocks/wall-clock@0.2.6 now
 //go:noescape
 func wasmimport_Now(result *DateTime)
 
-//go:wasmimport wasi:clocks/wall-clock@0.2.0 resolution
+//go:wasmimport wasi:clocks/wall-clock@0.2.6 resolution
 //go:noescape
 func wasmimport_Resolution(result *DateTime)

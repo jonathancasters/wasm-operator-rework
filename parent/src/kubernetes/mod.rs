@@ -5,7 +5,6 @@ use hyper_util::rt::TokioExecutor;
 use kube::client::ConfigExt;
 use kube::{Client, Config};
 use serde::de::DeserializeOwned;
-use std::fmt::Debug;
 use tower::BoxError;
 use tower::ServiceBuilder;
 
