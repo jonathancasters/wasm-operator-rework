@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use crate::config::metadata::WasmComponentMetadata;
+use crate::runtime::wasm::bindings::Operator;
 use tracing::{debug, error, info};
-use wasmtime::component::{HasSelf, bindgen};
+use wasmtime::component::{bindgen, HasData};
 use wasmtime::{
     Engine, Store,
     component::{Component, Linker, ResourceTable},
@@ -17,20 +18,29 @@ mod bindings {
     });
 }
 
+pub struct ParentApiState;
+
 pub struct ComponentCtx {
     pub wasi_ctx: WasiCtx,
     pub resource_table: ResourceTable,
+    pub parent_api_state: ParentApiState,
 }
 
-impl bindings::wasm_operator::operator::parent_api::Host for ComponentCtx {
+impl bindings::wasm_operator::operator::parent_api::Host for ParentApiState {
     async fn send_request(
         &mut self,
-        request: wasm_operator::operator::http::Request,
-    ) -> wasmtime::Result<wasm_operator::operator::types::AsyncId, String> {
+        request: bindings::wasm_operator::operator::http::Request,
+    ) -> wasmtime::Result<bindings::wasm_operator::operator::types::AsyncId, String> {
         info!("Host received request from Wasm component: {:?}", request);
         // TODO: integrate with actual KubernetesService
         Ok(1)
     }
+}
+
+struct WasmOperatorParentApi;
+
+impl HasData for WasmOperatorParentApi {
+    type Data<'a> = &'a mut ParentApiState;
 }
 
 impl IoView for ComponentCtx {
@@ -108,22 +118,26 @@ impl WasmRuntime {
         let state = ComponentCtx {
             wasi_ctx,
             resource_table: ResourceTable::new(),
+            parent_api_state: ParentApiState,
         };
         let mut store = Store::new(&engine, state);
 
         let mut linker = Linker::new(&engine);
         add_to_linker_async(&mut linker)?;
-        wasm_operator::operator::parent_api::add_to_linker::<_, ComponentCtx>(
+        bindings::wasm_operator::operator::parent_api::add_to_linker::<_, WasmOperatorParentApi>(
             &mut linker,
-            |ctx| ctx,
+            |ctx: &mut ComponentCtx| &mut ctx.parent_api_state,
         )?;
 
         debug!("Instantiating component: {}", metadata.name);
-        let (operator, _) = Operator::instantiate_async(&mut store, &component, &linker).await?;
+        let operator = Operator::instantiate_async(&mut store, &component, &linker).await?;
         debug!("Component instantiated successfully: {}", metadata.name);
 
         debug!("Running component: {}", metadata.name);
-        operator.child_api().call_start(&mut store).await?;
+        operator
+            .wasm_operator_operator_child_api()
+            .call_start(&mut store)
+            .await?;
         debug!("Component run finished: {}", metadata.name);
 
         Ok(())
