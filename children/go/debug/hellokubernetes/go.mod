@@ -1,6 +1,6 @@
 module hellokubernetes
 
-go 1.24.5
+go 1.23.3
 
 require (
 	go.bytecodealliance.org v0.7.0
