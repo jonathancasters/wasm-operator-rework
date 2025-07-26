@@ -30,7 +30,7 @@ name="tinygo"
 help="Alternative go compiler used to compile to wasip2"
 category="Go"
 [[commands]]
-package="go"
+package="go_1_23"
 name="go"
 help="Default go compiler"
 category="Go"
