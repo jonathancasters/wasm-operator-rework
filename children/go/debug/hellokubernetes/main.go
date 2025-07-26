@@ -37,11 +37,11 @@ func Start() {
 
 	if result.IsErr() {
 		// Some form of logging. In WASI, this might go to stderr.
-		fmt.Printf("failed to send request: %s\n", *result.Err())
+		fmt.Printf("child-component: failed to send request: %s\n", *result.Err())
 	} else {
 		// The request was sent, the async ID is in result.OK().
 		// The host will call HandleResponse with the response.
-		fmt.Printf("Sent request with ID: %d\n", *result.OK())
+		fmt.Printf("child-component: sent request with ID: %d\n", *result.OK())
 	}
 }
 
