@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use http::Uri;
-use hyper::{body::Body, Request};
+use hyper::Request;
 use hyper_util::rt::TokioExecutor;
 use kube::client::ConfigExt;
 use kube::{Client, Config};
@@ -36,25 +36,10 @@ impl KubernetesService {
     ///
     /// This function can handle any kind of HTTP request with any data.
     /// The response will be deserialized into the specified type.
-    pub async fn send_request<B, T>(&self, request: Request<B>) -> Result<T>
+    pub async fn send_request<T>(&self, request: Request<Vec<u8>>) -> Result<T>
     where
-        B: Body + Send + 'static,
-        B::Data: Send,
-        B::Error: Into<BoxError>,
         T: DeserializeOwned,
     {
-        // Convert the request body to Vec<u8> as required by kube-rs
-        let (parts, body) = request.into_parts();
-
-        // Collect the body into bytes
-        let body_bytes = match http_body_util::BodyExt::collect(body).await {
-            Ok(collected) => collected.to_bytes(),
-            Err(_) => return Err(anyhow::anyhow!("Failed to collect request body")),
-        };
-
-        // Create a new request with Vec<u8> body for kube-rs
-        let request = Request::from_parts(parts, body_bytes.into());
-
         // Send the request using the inner kube client
         // The kube client handles status code checking and deserialization
         let result: T = self
