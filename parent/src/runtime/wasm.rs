@@ -1,18 +1,12 @@
-use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use anyhow::Context;
 use serde_json::Value;
-use wasmtime::component::{HasData, Resource};
+use wasmtime::component::HasData;
 
 use crate::config::metadata::WasmComponentMetadata;
 use crate::kubernetes::KubernetesService;
 use crate::runtime::wasm::bindings::Operator;
-use crate::runtime::wasm::bindings::exports::wasm_operator::operator::child_api;
-use crate::runtime::wasm::bindings::wasm_operator::operator::http::Response;
-use http_body_util::BodyExt;
-use tokio::sync::mpsc::Sender;
 use tracing::{debug, error, info};
 use wasmtime::component::{Component, Linker, ResourceTable};
 use wasmtime::{Engine, Store};
@@ -58,9 +52,25 @@ impl bindings::wasm_operator::operator::parent_api::Host for ParentState {
         &mut self,
         request: bindings::wasm_operator::operator::http::Request,
     ) -> wasmtime::Result<bindings::wasm_operator::operator::types::AsyncId, String> {
-        info!("Host received request from Wasm component: {:?}", request);
-        // TODO: integrate with actual KubernetesService
-        Ok(1)
+        info!("Host received request from WASM component: {:?}", request);
+        let async_id = self.next_async_id;
+        self.next_async_id += 1;
+
+        let k8s_service = self.kubernetes_service.clone();
+        // Construct the hyper http request
+        let uri = http::Uri::from_str(&request.uri).map_err(|e| format!("Invalid URI: {}", e))?;
+        let method = http::Method::from_str(&request.method.to_string())
+            .map_err(|e| format!("Invalid method: {}", e))?;
+        let mut http_request = hyper::Request::builder().method(method).uri(uri);
+        for header in request.headers {
+            http_request = http_request.header(header.name, header.value);
+        }
+        let http_request = http_request.body(request.body).unwrap();
+        // Send the request
+        let response = k8s_service.send_request::<Value>(http_request).await;
+        info!("Got response from Kubernetes: {:?}", response);
+
+        Ok(async_id.into())
     }
 }
 
