@@ -24,16 +24,11 @@ fn main() -> anyhow::Result<()> {
         info!(" - {}", metadata.name);
     }
 
-    let runtime = Arc::new(WasmRuntime::new()?);
-
     // Create a tokio runtime and run the async code
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
-        // Example: Create a Kubernetes service and get all pods
-        info!("Creating Kubernetes service...");
-        let k8s_service = KubernetesService::new().await?;
-        
-        // Continue with the original functionality
+        let k8s_service = Arc::new(KubernetesService::new().await?);
+        let runtime = Arc::new(WasmRuntime::new(k8s_service.clone())?);
         runtime.run_components(components_metadata).await
     })?;
 
