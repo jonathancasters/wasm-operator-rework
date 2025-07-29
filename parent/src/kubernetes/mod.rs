@@ -53,7 +53,7 @@ impl KubernetesService {
         };
 
         // Create a new request with Vec<u8> body for kube-rs
-        let request = Request::from_parts(parts, body_bytes.to_vec());
+        let request = Request::from_parts(parts, body_bytes.into());
 
         // Send the request using the inner kube client
         // The kube client handles status code checking and deserialization
