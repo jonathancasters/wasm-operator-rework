@@ -6,7 +6,6 @@ package parentapi
 import (
 	"go.bytecodealliance.org/cm"
 	"hellokubernetes/internal/wasm-operator/operator/http"
-	"hellokubernetes/internal/wasm-operator/operator/types"
 )
 
 // Request represents the type alias "wasm-operator:operator/parent-api#request".
@@ -14,17 +13,44 @@ import (
 // See [http.Request] for more information.
 type Request = http.Request
 
-// AsyncID represents the type alias "wasm-operator:operator/parent-api#async-id".
+// Response represents the type alias "wasm-operator:operator/parent-api#response".
 //
-// See [types.AsyncID] for more information.
-type AsyncID = types.AsyncID
+// See [http.Response] for more information.
+type Response = http.Response
+
+// FutureResponse represents the imported resource "wasm-operator:operator/parent-api#future-response".
+//
+//	resource future-response
+type FutureResponse cm.Resource
+
+// ResourceDrop represents the imported resource-drop for resource "future-response".
+//
+// Drops a resource handle.
+//
+//go:nosplit
+func (self FutureResponse) ResourceDrop() {
+	self0 := cm.Reinterpret[uint32](self)
+	wasmimport_FutureResponseResourceDrop((uint32)(self0))
+	return
+}
+
+// Get represents the imported method "get".
+//
+//	get: func() -> result<response, string>
+//
+//go:nosplit
+func (self FutureResponse) Get() (result cm.Result[ResponseShape, Response, string]) {
+	self0 := cm.Reinterpret[uint32](self)
+	wasmimport_FutureResponseGet((uint32)(self0), &result)
+	return
+}
 
 // SendRequest represents the imported function "send-request".
 //
-//	send-request: func(req: request) -> result<async-id, string>
+//	send-request: func(req: request) -> result<future-response, string>
 //
 //go:nosplit
-func SendRequest(req Request) (result cm.Result[string, AsyncID, string]) {
+func SendRequest(req Request) (result cm.Result[string, FutureResponse, string]) {
 	req0, req1, req2, req3, req4, req5, req6 := lower_Request(req)
 	wasmimport_SendRequest((uint32)(req0), (*uint8)(req1), (uint32)(req2), (*http.Header)(req3), (uint32)(req4), (*uint8)(req5), (uint32)(req6), &result)
 	return

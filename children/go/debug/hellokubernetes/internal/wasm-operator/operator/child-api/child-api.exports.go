@@ -4,11 +4,6 @@ package childapi
 
 // Exports represents the caller-defined exports from "wasm-operator:operator/child-api".
 var Exports struct {
-	// HandleResponse represents the caller-defined, exported function "handle-response".
-	//
-	//	handle-response: func(id: async-id, res: response)
-	HandleResponse func(id AsyncID, res Response)
-
 	// Start represents the caller-defined, exported function "start".
 	//
 	//	start: func()

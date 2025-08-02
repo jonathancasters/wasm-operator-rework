@@ -9,7 +9,6 @@ use config::metadata::WasmComponentMetadata;
 use runtime::wasm::WasmRuntime;
 use tracing::{debug, info};
 use tracing_subscriber::FmtSubscriber;
-use wasmtime::Func;
 // Kubernetes imports
 use kubernetes::KubernetesService;
 
