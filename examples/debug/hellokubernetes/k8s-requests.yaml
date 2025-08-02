@@ -1,0 +1,5 @@
+name: "hellok8s"
+wasm: "../../../children/go/debug/hellokubernetes/target/hellok8s.wasm"
+env:
+  - name: RUST_LOG
+    value: "debug"
