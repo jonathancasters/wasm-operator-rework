@@ -1,10 +1,6 @@
 package wasm-operator:operator;
 
-interface types {
-    type async-id = u64;
-}
-
-interface http {
+interface k8s-http {
     enum method {
         get,
         post,
@@ -26,25 +22,22 @@ interface http {
     }
 
     record response {
-        status: u16,
-        headers: list<header>,
         body: list<u8>, // Body as raw bytes
     }
 }
 
 
 interface parent-api {
-    use http.{request};
-    use types.{async-id};
+    use k8s-http.{request, response};
 
-    send-request: func(req: request) -> result<async-id, string>;
+    resource future-response {
+        get: func() -> result<response, string>;
+    }
+
+    send-request: func(req: request) -> result<future-response, string>;
 }
 
 interface child-api {
-    use http.{response};
-    use types.{async-id};
-
-    handle-response: func(id: async-id, res: response);
     start: func();
 }
 

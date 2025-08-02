@@ -5,7 +5,14 @@ package parentapi
 import (
 	"go.bytecodealliance.org/cm"
 	"hellokubernetes/internal/wasm-operator/operator/http"
+	"unsafe"
 )
+
+// ResponseShape is used for storage in variant or result types.
+type ResponseShape struct {
+	_     cm.HostLayout
+	shape [unsafe.Sizeof(Response{})]byte
+}
 
 func lower_Request(v http.Request) (f0 uint32, f1 *uint8, f2 uint32, f3 *http.Header, f4 uint32, f5 *uint8, f6 uint32) {
 	f0 = (uint32)(v.Method)

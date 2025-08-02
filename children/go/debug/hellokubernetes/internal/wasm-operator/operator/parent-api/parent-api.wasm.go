@@ -9,6 +9,14 @@ import (
 
 // This file contains wasmimport and wasmexport declarations for "wasm-operator:operator".
 
+//go:wasmimport wasm-operator:operator/parent-api [resource-drop]future-response
+//go:noescape
+func wasmimport_FutureResponseResourceDrop(self0 uint32)
+
+//go:wasmimport wasm-operator:operator/parent-api [method]future-response.get
+//go:noescape
+func wasmimport_FutureResponseGet(self0 uint32, result *cm.Result[ResponseShape, Response, string])
+
 //go:wasmimport wasm-operator:operator/parent-api send-request
 //go:noescape
-func wasmimport_SendRequest(req0 uint32, req1 *uint8, req2 uint32, req3 *http.Header, req4 uint32, req5 *uint8, req6 uint32, result *cm.Result[string, AsyncID, string])
+func wasmimport_SendRequest(req0 uint32, req1 *uint8, req2 uint32, req3 *http.Header, req4 uint32, req5 *uint8, req6 uint32, result *cm.Result[string, FutureResponse, string])

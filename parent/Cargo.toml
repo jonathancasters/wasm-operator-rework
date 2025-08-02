@@ -18,7 +18,10 @@ http = "1.1.0"
 http-body = "1.0.1"
 http-body-util = "0.1.2"
 hyper = "1.2.0"
+bytes = "1"
+
 hyper-util = "0.1.11"
 tower = "0.5.1"
 tower-http = "0.6.1"
 serde_json = "1.0.140"
+

@@ -8,19 +8,10 @@ import (
 	"hellokubernetes/internal/wasm-operator/operator/child-api"
 	"hellokubernetes/internal/wasm-operator/operator/http"
 	parentapi "hellokubernetes/internal/wasm-operator/operator/parent-api"
-	"hellokubernetes/internal/wasm-operator/operator/types"
 )
 
 func init() {
-	childapi.Exports.HandleResponse = HandleResponse
 	childapi.Exports.Start = Start
-}
-
-// HandleResponse is called by the host when a response is ready.
-func HandleResponse(id types.AsyncID, res http.Response) {
-	fmt.Printf("Received response for ID: %d\n", id)
-	fmt.Printf("Status: %d\n", res.Status)
-	fmt.Printf("Body: %s\n", string(res.Body.Slice()))
 }
 
 // Start is called by the host to initiate the process of sending a request.
@@ -37,12 +28,21 @@ func Start() {
 
 	if result.IsErr() {
 		// Some form of logging. In WASI, this might go to stderr.
-		fmt.Printf("child-component: failed to send request: %s\n", *result.Err())
-	} else {
-		// The request was sent, the async ID is in result.OK().
-		// The host will call HandleResponse with the response.
-		fmt.Printf("child-component: sent request with ID: %d\n", *result.OK())
+		fmt.Printf("child-component: failed to send request: %s", *result.Err())
+		return
 	}
+
+	future := result.OK()
+	responseResult := future.Get()
+	if responseResult.IsErr() {
+		fmt.Printf("child-component: failed to get response: %s", *responseResult.Err())
+		return
+	}
+
+	response := responseResult.OK()
+	fmt.Printf("Received response")
+	fmt.Printf("Status: %d", response.Status)
+	fmt.Printf("Body: %s", string(response.Body.Slice()))
 }
 
 func main() {}

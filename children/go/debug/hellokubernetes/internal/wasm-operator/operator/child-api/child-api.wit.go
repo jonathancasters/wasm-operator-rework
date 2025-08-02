@@ -2,18 +2,3 @@
 
 // Package childapi represents the exported interface "wasm-operator:operator/child-api".
 package childapi
-
-import (
-	"hellokubernetes/internal/wasm-operator/operator/http"
-	"hellokubernetes/internal/wasm-operator/operator/types"
-)
-
-// Response represents the type alias "wasm-operator:operator/child-api#response".
-//
-// See [http.Response] for more information.
-type Response = http.Response
-
-// AsyncID represents the type alias "wasm-operator:operator/child-api#async-id".
-//
-// See [types.AsyncID] for more information.
-type AsyncID = types.AsyncID
