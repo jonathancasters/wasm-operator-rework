@@ -3,12 +3,27 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"go.bytecodealliance.org/cm"
 	"hellokubernetes/internal/wasm-operator/operator/child-api"
-	"hellokubernetes/internal/wasm-operator/operator/http"
+	"hellokubernetes/internal/wasm-operator/operator/k8s-http"
 	parentapi "hellokubernetes/internal/wasm-operator/operator/parent-api"
 )
+
+// Structs to match the Kubernetes API response
+
+type PodList struct {
+	Items []Pod `json:"items"`
+}
+
+type Pod struct {
+	Metadata Metadata `json:"metadata"`
+}
+
+type Metadata struct {
+	Name string `json:"name"`
+}
 
 func init() {
 	childapi.Exports.Start = Start
@@ -16,10 +31,10 @@ func init() {
 
 // Start is called by the host to initiate the process of sending a request.
 func Start() {
-	request := http.Request{
-		Method:  http.MethodGet,
+	request := k8shttp.Request{
+		Method:  k8shttp.MethodGet,
 		URI:     "/api/v1/pods",
-		Headers: cm.ToList([]http.Header{}),
+		Headers: cm.ToList([]k8shttp.Header{}),
 		Body:    cm.ToList([]byte{}),
 	}
 
@@ -40,9 +55,17 @@ func Start() {
 	}
 
 	response := responseResult.OK()
-	fmt.Printf("Received response")
-	fmt.Printf("Status: %d", response.Status)
-	fmt.Printf("Body: %s", string(response.Body.Slice()))
+	var podList PodList
+	err := json.Unmarshal(response.Body.Bytes.Slice(), &podList)
+	if err != nil {
+		fmt.Printf("child-component: failed to unmarshal json: %s", err)
+		return
+	}
+
+	fmt.Printf("Running pods:\n")
+	for _, pod := range podList.Items {
+		fmt.Printf("- %s\n", pod.Metadata.Name)
+	}
 }
 
 func main() {}

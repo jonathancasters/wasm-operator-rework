@@ -21,8 +21,12 @@ interface k8s-http {
         body: list<u8>, // Body as raw bytes
     }
 
+    record body-bytes {
+        bytes: list<u8>,
+    }
+
     record response {
-        body: list<u8>, // Body as raw bytes
+        body: body-bytes,
     }
 }
 

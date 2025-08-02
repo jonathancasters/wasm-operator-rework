@@ -5,18 +5,18 @@ package parentapi
 
 import (
 	"go.bytecodealliance.org/cm"
-	"hellokubernetes/internal/wasm-operator/operator/http"
+	k8shttp "hellokubernetes/internal/wasm-operator/operator/k8s-http"
 )
 
 // Request represents the type alias "wasm-operator:operator/parent-api#request".
 //
-// See [http.Request] for more information.
-type Request = http.Request
+// See [k8shttp.Request] for more information.
+type Request = k8shttp.Request
 
 // Response represents the type alias "wasm-operator:operator/parent-api#response".
 //
-// See [http.Response] for more information.
-type Response = http.Response
+// See [k8shttp.Response] for more information.
+type Response = k8shttp.Response
 
 // FutureResponse represents the imported resource "wasm-operator:operator/parent-api#future-response".
 //
@@ -52,6 +52,6 @@ func (self FutureResponse) Get() (result cm.Result[ResponseShape, Response, stri
 //go:nosplit
 func SendRequest(req Request) (result cm.Result[string, FutureResponse, string]) {
 	req0, req1, req2, req3, req4, req5, req6 := lower_Request(req)
-	wasmimport_SendRequest((uint32)(req0), (*uint8)(req1), (uint32)(req2), (*http.Header)(req3), (uint32)(req4), (*uint8)(req5), (uint32)(req6), &result)
+	wasmimport_SendRequest((uint32)(req0), (*uint8)(req1), (uint32)(req2), (*k8shttp.Header)(req3), (uint32)(req4), (*uint8)(req5), (uint32)(req6), &result)
 	return
 }
