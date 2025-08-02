@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::mem;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -68,8 +69,9 @@ impl bindings::wasm_operator::operator::parent_api::HostFutureResponse for State
     ) -> impl Future<Output = Result<bindings::wasm_operator::operator::k8s_http::Response, String>> + Send
     {
         Box::pin(async move {
-            let future = self.resources.delete(entry).map_err(|e| e.to_string())?;
-            future.receiver.await.map_err(|e| e.to_string())?
+            let future = self.resources.get_mut(&entry).map_err(|e| e.to_string())?;
+            let rx = mem::replace(&mut future.receiver, oneshot::channel().1);
+            rx.await.map_err(|e| e.to_string())?
         })
     }
 
@@ -141,7 +143,11 @@ async fn execute_request(
     let bytes = serde_json::to_vec(&response)
         .map_err(|e| format!("Failed to serialize response: {}", e))?;
 
-    Ok(bindings::wasm_operator::operator::k8s_http::Response { body: bytes })
+    let response_body = bindings::wasm_operator::operator::k8s_http::BodyBytes { bytes };
+
+    Ok(bindings::wasm_operator::operator::k8s_http::Response {
+        body: response_body,
+    })
 }
 
 /// Abstraction of the wasmtime runtime

@@ -4,7 +4,7 @@ package parentapi
 
 import (
 	"go.bytecodealliance.org/cm"
-	"hellokubernetes/internal/wasm-operator/operator/http"
+	k8shttp "hellokubernetes/internal/wasm-operator/operator/k8s-http"
 	"unsafe"
 )
 
@@ -14,7 +14,7 @@ type ResponseShape struct {
 	shape [unsafe.Sizeof(Response{})]byte
 }
 
-func lower_Request(v http.Request) (f0 uint32, f1 *uint8, f2 uint32, f3 *http.Header, f4 uint32, f5 *uint8, f6 uint32) {
+func lower_Request(v k8shttp.Request) (f0 uint32, f1 *uint8, f2 uint32, f3 *k8shttp.Header, f4 uint32, f5 *uint8, f6 uint32) {
 	f0 = (uint32)(v.Method)
 	f1, f2 = cm.LowerString(v.URI)
 	f3, f4 = cm.LowerList(v.Headers)

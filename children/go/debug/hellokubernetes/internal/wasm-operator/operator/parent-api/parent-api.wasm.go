@@ -4,7 +4,7 @@ package parentapi
 
 import (
 	"go.bytecodealliance.org/cm"
-	"hellokubernetes/internal/wasm-operator/operator/http"
+	k8shttp "hellokubernetes/internal/wasm-operator/operator/k8s-http"
 )
 
 // This file contains wasmimport and wasmexport declarations for "wasm-operator:operator".
@@ -19,4 +19,4 @@ func wasmimport_FutureResponseGet(self0 uint32, result *cm.Result[ResponseShape,
 
 //go:wasmimport wasm-operator:operator/parent-api send-request
 //go:noescape
-func wasmimport_SendRequest(req0 uint32, req1 *uint8, req2 uint32, req3 *http.Header, req4 uint32, req5 *uint8, req6 uint32, result *cm.Result[string, FutureResponse, string])
+func wasmimport_SendRequest(req0 uint32, req1 *uint8, req2 uint32, req3 *k8shttp.Header, req4 uint32, req5 *uint8, req6 uint32, result *cm.Result[string, FutureResponse, string])
