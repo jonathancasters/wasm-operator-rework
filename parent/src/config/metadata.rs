@@ -24,6 +24,10 @@ impl WasmComponentMetadata {
     pub fn load_from_yaml(path: &PathBuf) -> Result<Vec<WasmComponentMetadata>> {
         let contents = fs::read_to_string(path)?;
 
+        if contents.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
         contents
             .split("\n---")
             .filter_map(
