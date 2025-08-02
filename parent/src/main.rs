@@ -1,4 +1,12 @@
+//! # Main Module
+//!
+//! This module serves as the entry point for the Wasm Operator. It is responsible for
+//! parsing command-line arguments, setting up logging, loading the WASM component
+//! configuration, and orchestrating the Kubernetes service and the WASM runtime
+//! to execute the Wasm modules.
+
 mod config;
+mod host;
 mod kubernetes;
 mod runtime;
 
@@ -6,11 +14,10 @@ use std::sync::Arc;
 use std::{env, path::PathBuf};
 
 use config::metadata::WasmComponentMetadata;
-use runtime::wasm::WasmRuntime;
+use kubernetes::KubernetesService;
+use runtime::WasmRuntime;
 use tracing::{debug, info};
 use tracing_subscriber::FmtSubscriber;
-// Kubernetes imports
-use kubernetes::KubernetesService;
 
 fn main() -> anyhow::Result<()> {
     let (config_path, debug) = parse_args()?;

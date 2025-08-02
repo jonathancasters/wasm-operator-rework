@@ -1,3 +1,9 @@
+//! # Metadata Module
+//!
+//! This module defines the data structures for representing WebAssembly (Wasm) component
+//! metadata, including environment variables and command-line arguments. It also provides
+//! functionality for loading this metadata from YAML configuration files.
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
