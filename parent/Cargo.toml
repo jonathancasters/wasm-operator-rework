@@ -12,6 +12,7 @@ tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 wasmtime = "34.0.1"
 wasmtime-wasi = "34.0.1"
+k8s-openapi = { version = "0.25.0", features = ["v1_32"] }
 kube = { version = "1.1.0", features = ["runtime", "derive"] }
 http = "1.1.0"
 hyper = "1.2.0"

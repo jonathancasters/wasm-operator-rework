@@ -1748,6 +1748,7 @@ dependencies = [
  "http",
  "hyper",
  "hyper-util",
+ "k8s-openapi",
  "kube",
  "serde",
  "serde_json",
