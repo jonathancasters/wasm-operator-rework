@@ -5,7 +5,7 @@
 //! and serialization/deserialization of Kubernetes API responses.
 
 use anyhow::{Context, Result};
-use http::{Request, Uri};
+use http::Request;
 use hyper_util::rt::TokioExecutor;
 use kube::client::ConfigExt;
 use kube::{Client, Config};
@@ -17,7 +17,6 @@ use tower::{BoxError, ServiceBuilder};
 use crate::host::api::bindings;
 
 pub struct KubernetesService {
-    pub base_uri: Uri,
     inner: Client,
 }
 
@@ -34,10 +33,7 @@ impl KubernetesService {
             );
         let client = Client::new(service, kubeconfig.default_namespace);
 
-        Ok(KubernetesService {
-            base_uri: kubeconfig.cluster_url.clone(),
-            inner: client,
-        })
+        Ok(KubernetesService { inner: client })
     }
 
     pub async fn execute_request(
@@ -90,12 +86,5 @@ impl KubernetesService {
             .context("Failed to send request to Kubernetes API")?;
 
         Ok(result)
-    }
-
-    /// Generate a full URI from the base URI and a path and query.
-    pub fn generate_url(&self, path_and_query: &http::uri::PathAndQuery) -> Uri {
-        let mut parts = self.base_uri.clone().into_parts();
-        parts.path_and_query = Some(path_and_query.clone());
-        Uri::from_parts(parts).expect("invalid URI construction")
     }
 }
