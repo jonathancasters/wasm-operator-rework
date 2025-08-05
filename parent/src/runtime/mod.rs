@@ -46,13 +46,16 @@ impl WasmRuntime {
         for metadata in components_metadata {
             let runtime = Arc::clone(&self);
             let handle = tokio::spawn(async move {
-                let instance = WasmInstance::new(
-                    runtime.engine.clone(),
-                    runtime.kubernetes_service.clone(),
-                    metadata,
-                );
-                if let Err(e) = instance.run().await {
-                    error!("Module failed: {:?}", e);
+                loop {
+                    let instance = WasmInstance::new(
+                        runtime.engine.clone(),
+                        runtime.kubernetes_service.clone(),
+                        metadata.clone(),
+                    );
+                    if let Err(e) = instance.run().await {
+                        error!("Module failed: {:?}", e);
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 }
             });
             handles.push(handle);

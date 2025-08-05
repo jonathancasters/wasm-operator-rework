@@ -110,6 +110,13 @@ func reconcileResource(inResource *TestResource, outNamespace string) {
 		return
 	}
 
+	// If the resource name is empty after unmarshalling, it means the resource doesn't exist.
+	if outResource.Metadata.Name == "" {
+		fmt.Printf("Output resource %s not found (empty name), creating it.\n", resourceName)
+		createResource(inResource, outNamespace)
+		return
+	}
+
 	if inResource.Spec.Nonce > outResource.Spec.Nonce {
 		fmt.Printf("Input nonce (%d) > output nonce (%d) for %s. Updating.\n", inResource.Spec.Nonce, outResource.Spec.Nonce, resourceName)
 		updateResource(inResource, &outResource, outNamespace)
@@ -148,21 +155,34 @@ func createResource(inResource *TestResource, outNamespace string) {
 }
 
 func updateResource(inResource, outResource *TestResource, outNamespace string) {
-	outResource.Spec.Nonce = inResource.Spec.Nonce
-	outResource.Spec.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	// Create a new resource to avoid side effects
+	updatedResource := TestResource{
+		APIVersion: "amurant.io/v1",
+		Kind:       "TestResource",
+		Metadata: ObjectMeta{
+			Name:            inResource.Metadata.Name,
+			Namespace:       outNamespace,
+			ResourceVersion: outResource.Metadata.ResourceVersion, // Preserve resource version for updates
+		},
+		Spec: TestResourceSpec{
+			Nonce:     inResource.Spec.Nonce,
+			UpdatedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		},
+	}
 
-	body, err := json.Marshal(outResource)
+	body, err := json.Marshal(updatedResource)
 	if err != nil {
 		fmt.Printf("Error marshalling for update: %v\n", err)
 		return
 	}
 
-	updateURI := fmt.Sprintf("/apis/amurant.io/v1/namespaces/%s/testresources/%s", outNamespace, outResource.Metadata.Name)
+	// PUT to a resource's specific URI will create it if it doesn't exist, or update it if it does.
+	updateURI := fmt.Sprintf("/apis/amurant.io/v1/namespaces/%s/testresources/%s", outNamespace, inResource.Metadata.Name)
 	_, err = sendRequest(k8shttp.MethodPut, updateURI, body)
 	if err != nil {
-		fmt.Printf("Error updating resource %s: %v\n", outResource.Metadata.Name, err)
+		fmt.Printf("Error updating resource %s: %v\n", inResource.Metadata.Name, err)
 	} else {
-		fmt.Printf("Successfully updated resource %s.\n", outResource.Metadata.Name)
+		fmt.Printf("Successfully updated resource %s.\n", inResource.Metadata.Name)
 	}
 }
 
