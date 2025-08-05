@@ -6,13 +6,9 @@
 
 use anyhow::{Context, Result};
 use http::Request;
-use hyper_util::rt::TokioExecutor;
-use kube::client::ConfigExt;
 use kube::{Client, Config};
-use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::str::FromStr;
-use tower::{BoxError, ServiceBuilder};
 
 use crate::host::api::bindings;
 
@@ -22,17 +18,10 @@ pub struct KubernetesService {
 
 impl KubernetesService {
     pub async fn new() -> Result<Self> {
-        let kubeconfig: Config = Config::infer().await?;
-        let https = kubeconfig.rustls_https_connector()?;
-        let service = ServiceBuilder::new()
-            .layer(kubeconfig.base_uri_layer())
-            .option_layer(kubeconfig.auth_layer()?)
-            .map_err(BoxError::from)
-            .service(
-                hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https),
-            );
-        let client = Client::new(service, kubeconfig.default_namespace);
-
+        let config = Config::infer()
+            .await
+            .context("Failed to infer Kubernetes config")?;
+        let client = Client::try_from(config).context("Failed to create Kubernetes client")?;
         Ok(KubernetesService { inner: client })
     }
 
@@ -44,7 +33,7 @@ impl KubernetesService {
         let method = http::Method::from_str(&request.method.to_string())
             .map_err(|e| format!("Invalid method: {}", e))?;
 
-        let mut http_request_builder = hyper::Request::builder().method(method).uri(uri);
+        let mut http_request_builder = Request::builder().method(method).uri(uri);
         for header in request.headers {
             http_request_builder =
                 http_request_builder.header(header.name.clone(), header.value.clone());
@@ -54,10 +43,18 @@ impl KubernetesService {
             .body(request.body)
             .map_err(|e| format!("Failed to build request: {}", e))?;
 
-        let response = self
-            .send_request::<Value>(http_request)
-            .await
-            .map_err(|e| format!("Failed to send request: {}", e))?;
+        let response = self.send_request(http_request).await;
+
+        let response = match response {
+            Ok(response) => response,
+            Err(kube::Error::Api(ae)) => {
+                // If the error is an API error, we want to return the `Status` object
+                // to the guest module, so it can handle the error gracefully.
+                serde_json::to_value(ae)
+                    .map_err(|e| format!("Failed to serialize error response: {}", e))?
+            }
+            Err(e) => return Err(format!("Failed to get response: {}", e)),
+        };
 
         let bytes = serde_json::to_vec(&response)
             .map_err(|e| format!("Failed to serialize response: {}", e))?;
@@ -70,21 +67,7 @@ impl KubernetesService {
     }
 
     /// Send a request to the Kubernetes API and deserialize the response.
-    ///
-    /// This function can handle any kind of HTTP request with any data.
-    /// The response will be deserialized into the specified type.
-    pub async fn send_request<T>(&self, request: Request<Vec<u8>>) -> Result<T>
-    where
-        T: DeserializeOwned,
-    {
-        // Send the request using the inner kube client
-        // The kube client handles status code checking and deserialization
-        let result: T = self
-            .inner
-            .request(request)
-            .await
-            .context("Failed to send request to Kubernetes API")?;
-
-        Ok(result)
+    pub async fn send_request(&self, request: Request<Vec<u8>>) -> Result<Value, kube::Error> {
+        self.inner.request(request).await
     }
 }
