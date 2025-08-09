@@ -44,7 +44,7 @@ kubectl wait --for=condition=Ready pod/test-pod-1 pod/test-pod-2 --timeout=60s |
 
 echo "📡 Running Rust application via cargo..."
 KUBECONFIG="$(kind get kubeconfig-path --name=$CLUSTER_NAME 2>/dev/null)" \
-cargo run --manifest-path "$MANIFEST_PATH" -- "$CONFIG_PATH" --debug
+cargo run --manifest-path "$MANIFEST_PATH" "$CONFIG_PATH" --debug
 
 echo "✅ Test complete."
 
