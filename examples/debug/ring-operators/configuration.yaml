@@ -1,0 +1,15 @@
+name: "go-ring-operator"
+wasm: "../../../children/go/debug/ring-operator/target/main.wasm"
+env:
+  - name: IN_NAMESPACE
+    value: "ring-a"
+  - name: OUT_NAMESPACE
+    value: "ring-b"
+---
+name: "rust-ring-operator"
+wasm: "../../../children/rust/debug/ring-operator/target/main.wasm"
+env:
+  - name: IN_NAMESPACE
+    value: "ring-b"
+  - name: OUT_NAMESPACE
+    value: "ring-a"
