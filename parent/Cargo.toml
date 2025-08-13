@@ -5,9 +5,10 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+dashmap = "5.5.3"
 serde_yml = "0.0.12"
-tokio = "1.14.0"
+tokio = { version = "1.14.0", features = ["rt", "rt-multi-thread", "macros", "fs"] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 wasmtime = "34.0.1"
@@ -16,9 +17,11 @@ k8s-openapi = { version = "0.25.0", features = ["v1_32"] }
 kube = { version = "1.1.0", features = ["runtime", "derive"] }
 http = "1.1.0"
 hyper = "1.2.0"
-bytes = "1"
+async-trait = "0.1.77"
 
 hyper-util = "0.1.11"
 tower = "0.5.1"
 serde_json = "1.0.140"
+futures = "0.3.31"
+futures-util = "0.3.31"
 

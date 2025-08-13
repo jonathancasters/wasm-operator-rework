@@ -5,89 +5,90 @@
 //! the host functions that Wasm modules can call, such as sending requests to the
 //! Kubernetes API and handling asynchronous responses.
 
-use std::future::Future;
-use std::mem;
-
-use tokio::sync::oneshot;
-use tracing::{error, info};
-use wasmtime::component::Resource;
-
 use crate::host::state::State;
+use std::future::Future;
 
 pub mod bindings {
     wasmtime::component::bindgen!({
-        async: true,
-        with: {
-            "wasm-operator:operator/parent-api/future-response": crate::host::api::FutureResponse
-        }
+            async: true,
+            path: "wit/",
+            world: "kube-operator"
     });
 }
 
-#[derive(Debug)]
-pub struct FutureResponse {
-    pub receiver:
-        oneshot::Receiver<Result<bindings::wasm_operator::operator::k8s_http::Response, String>>,
-}
+impl bindings::local::operator::types::Host for State {}
 
-impl std::fmt::Display for bindings::wasm_operator::operator::k8s_http::Method {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            bindings::wasm_operator::operator::k8s_http::Method::Get => write!(f, "GET"),
-            bindings::wasm_operator::operator::k8s_http::Method::Post => write!(f, "POST"),
-            bindings::wasm_operator::operator::k8s_http::Method::Put => write!(f, "PUT"),
-            bindings::wasm_operator::operator::k8s_http::Method::Delete => write!(f, "DELETE"),
-            bindings::wasm_operator::operator::k8s_http::Method::Patch => write!(f, "PATCH"),
+impl bindings::local::operator::kubernetes::Host for State {
+    fn log(
+        &mut self,
+        level: bindings::local::operator::types::LogLevel,
+        message: String,
+    ) -> impl Future<Output=()> + Send {
+        async move {
+            match level {
+                bindings::local::operator::types::LogLevel::Trace => tracing::trace!(message),
+                bindings::local::operator::types::LogLevel::Debug => tracing::debug!(message),
+                bindings::local::operator::types::LogLevel::Info => tracing::info!(message),
+                bindings::local::operator::types::LogLevel::Warn => tracing::warn!(message),
+                bindings::local::operator::types::LogLevel::Error => tracing::error!(message),
+            }
         }
     }
-}
 
-impl bindings::wasm_operator::operator::parent_api::HostFutureResponse for State {
-    fn get(
+    fn get_resource(
         &mut self,
-        entry: Resource<FutureResponse>,
-    ) -> impl Future<Output = Result<bindings::wasm_operator::operator::k8s_http::Response, String>> + Send
-    {
-        Box::pin(async move {
-            let future = self.resources.get_mut(&entry).map_err(|e| e.to_string())?;
-            let rx = mem::replace(&mut future.receiver, oneshot::channel().1);
-            rx.await.map_err(|e| e.to_string())?
-        })
+        kind: String,
+        name: String,
+        namespace: String,
+    ) -> impl Future<Output=Result<String, String>> + Send {
+        async move {
+            self.kubernetes_service
+                .get_resource(&kind, &name, &namespace)
+                .await
+                .map_err(|e| e.to_string())
+        }
     }
 
-    fn drop(
+    fn create_resource(
         &mut self,
-        rep: Resource<FutureResponse>,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send {
-        Box::pin(async move {
-            self.resources.delete(rep)?;
-            Ok(())
-        })
+        kind: String,
+        namespace: String,
+        resource_json: String,
+    ) -> impl Future<Output=Result<(), String>> + Send {
+        async move {
+            self.kubernetes_service
+                .create_resource(&kind, &namespace, &resource_json)
+                .await
+                .map_err(|e| e.to_string())
+        }
     }
-}
 
-impl bindings::wasm_operator::operator::parent_api::Host for State {
-    fn send_request(
+    fn update_resource(
         &mut self,
-        request: bindings::wasm_operator::operator::k8s_http::Request,
-    ) -> impl Future<Output = Result<Resource<FutureResponse>, String>> + Send {
-        info!("Host received request from WASM component: {:?}", request);
+        kind: String,
+        name: String,
+        namespace: String,
+        resource_json: String,
+    ) -> impl Future<Output=Result<(), String>> + Send {
+        async move {
+            self.kubernetes_service
+                .update_resource(&kind, &name, &namespace, &resource_json)
+                .await
+                .map_err(|e| e.to_string())
+        }
+    }
 
-        let (sender, receiver) = oneshot::channel();
-        let k8s_service = self.kubernetes_service.clone();
-
-        tokio::spawn(async move {
-            let result = k8s_service.execute_request(request).await;
-            if sender.send(result).is_err() {
-                error!("Failed to send response to WASM component: receiver was dropped");
-            }
-        });
-
-        let future_response = FutureResponse { receiver };
-        let result = self
-            .resources
-            .push(future_response)
-            .map_err(|e| e.to_string());
-
-        std::future::ready(result)
+    fn delete_resource(
+        &mut self,
+        kind: String,
+        name: String,
+        namespace: String,
+    ) -> impl Future<Output=Result<(), String>> + Send {
+        async move {
+            self.kubernetes_service
+                .delete_resource(&kind, &name, &namespace)
+                .await
+                .map_err(|e| e.to_string())
+        }
     }
 }
