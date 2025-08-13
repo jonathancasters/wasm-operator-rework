@@ -4,70 +4,110 @@
 //! the creation of a Kubernetes client, execution of HTTP requests against the API,
 //! and serialization/deserialization of Kubernetes API responses.
 
-use anyhow::{Context, Result};
-use http::Request;
-use kube::{Client, Config};
+use anyhow::{anyhow, Context, Result};
+use kube::api::{Api, DeleteParams, DynamicObject, Patch, PatchParams, PostParams};
+use kube::discovery::{ApiGroup, ApiResource};
+use kube::{Client, Config, Discovery};
 use serde_json::Value;
-use std::str::FromStr;
 
-use crate::host::api::bindings;
-
+/// A service for interacting with the Kubernetes API dynamically.
+///
+/// This service discovers available API resources at startup and provides
+/// methods to interact with them using dynamic objects, allowing it to work
+/// with any Kubernetes resource kind, including Custom Resources.
 pub struct KubernetesService {
-    inner: Client,
+    client: Client,
+    discovery: Discovery,
 }
 
 impl KubernetesService {
+    /// Creates a new `KubernetesService`.
+    ///
+    /// This function infers the Kubernetes configuration from the environment,
+    /// creates a Kubernetes client, and performs API discovery.
     pub async fn new() -> Result<Self> {
         let config = Config::infer()
             .await
             .context("Failed to infer Kubernetes config")?;
         let client = Client::try_from(config).context("Failed to create Kubernetes client")?;
-        Ok(KubernetesService { inner: client })
+        let discovery = Discovery::new(client.clone())
+            .run()
+            .await
+            .context("Failed to run Kubernetes API discovery")?;
+        Ok(KubernetesService { client, discovery })
     }
 
-    pub async fn execute_request(
-        &self,
-        request: bindings::wasm_operator::operator::k8s_http::Request,
-    ) -> Result<bindings::wasm_operator::operator::k8s_http::Response, String> {
-        let uri = http::Uri::from_str(&request.uri).map_err(|e| format!("Invalid URI: {}", e))?;
-        let method = http::Method::from_str(&request.method.to_string())
-            .map_err(|e| format!("Invalid method: {}", e))?;
-
-        let mut http_request_builder = Request::builder().method(method).uri(uri);
-        for header in request.headers {
-            http_request_builder =
-                http_request_builder.header(header.name.clone(), header.value.clone());
-        }
-
-        let http_request = http_request_builder
-            .body(request.body)
-            .map_err(|e| format!("Failed to build request: {}", e))?;
-
-        let response = self.send_request(http_request).await;
-
-        let response = match response {
-            Ok(response) => response,
-            Err(kube::Error::Api(ae)) => {
-                // If the error is an API error, we want to return the `Status` object
-                // to the guest module, so it can handle the error gracefully.
-                serde_json::to_value(ae)
-                    .map_err(|e| format!("Failed to serialize error response: {}", e))?
+    /// Finds the `ApiResource` and (optional) `ApiGroup` for a given kind.
+    ///
+    /// This function searches the discovered API resources for a kind matching
+    /// the provided name (case-insensitive).
+    pub fn find_api_resource(&self, kind: &str) -> Result<(ApiResource, Option<&ApiGroup>)> {
+        for group in self.discovery.groups() {
+            for version in group.versions() {
+                for (ar, _caps) in group.versioned_resources(version) {
+                    if ar.kind.eq_ignore_ascii_case(kind) {
+                        return Ok((ar.clone(), Some(group)));
+                    }
+                }
             }
-            Err(e) => return Err(format!("Failed to get response: {}", e)),
-        };
-
-        let bytes = serde_json::to_vec(&response)
-            .map_err(|e| format!("Failed to serialize response: {}", e))?;
-
-        let response_body = bindings::wasm_operator::operator::k8s_http::BodyBytes { bytes };
-
-        Ok(bindings::wasm_operator::operator::k8s_http::Response {
-            body: response_body,
-        })
+        }
+        Err(anyhow!(
+            "Kind '{}' not found in discovered API resources",
+            kind
+        ))
     }
 
-    /// Send a request to the Kubernetes API and deserialize the response.
-    pub async fn send_request(&self, request: Request<Vec<u8>>) -> Result<Value, kube::Error> {
-        self.inner.request(request).await
+    /// Returns a dynamic, namespaced API client for a given `ApiResource`.
+    pub fn dynamic_api(&self, ar: ApiResource, namespace: &str) -> Api<DynamicObject> {
+        Api::namespaced_with(self.client.clone(), namespace, &ar)
+    }
+
+    pub async fn get_resource(&self, kind: &str, name: &str, namespace: &str) -> Result<String> {
+        let (ar, _) = self.find_api_resource(kind)?;
+        let api = self.dynamic_api(ar, namespace);
+        let resource = api.get(name).await.context("Failed to get resource")?;
+        serde_json::to_string(&resource).context("Failed to serialize resource to JSON")
+    }
+
+    pub async fn create_resource(
+        &self,
+        kind: &str,
+        namespace: &str,
+        resource_json: &str,
+    ) -> Result<()> {
+        let (ar, _) = self.find_api_resource(kind)?;
+        let api = self.dynamic_api(ar, namespace);
+        let resource: DynamicObject = serde_json::from_str(resource_json)
+            .context("Failed to deserialize resource from JSON")?;
+        api.create(&PostParams::default(), &resource)
+            .await
+            .context("Failed to create resource")?;
+        Ok(())
+    }
+
+    pub async fn update_resource(
+        &self,
+        kind: &str,
+        name: &str,
+        namespace: &str,
+        resource_json: &str,
+    ) -> Result<()> {
+        let (ar, _) = self.find_api_resource(kind)?;
+        let api = self.dynamic_api(ar, namespace);
+        let resource: Value = serde_json::from_str(resource_json)
+            .context("Failed to deserialize resource from JSON for update")?;
+        api.patch(name, &PatchParams::apply(kind), &Patch::Apply(&resource))
+            .await
+            .context("Failed to update resource")?;
+        Ok(())
+    }
+
+    pub async fn delete_resource(&self, kind: &str, name: &str, namespace: &str) -> Result<()> {
+        let (ar, _) = self.find_api_resource(kind)?;
+        let api = self.dynamic_api(ar, namespace);
+        api.delete(name, &DeleteParams::default())
+            .await
+            .context("Failed to delete resource")?;
+        Ok(())
     }
 }

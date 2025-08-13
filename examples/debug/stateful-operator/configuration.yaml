@@ -1,0 +1,2 @@
+name: stateful-operator
+wasm: ../../../children/rust/debug/stateful-operator/target/wasm32-wasi/debug/stateful_operator.wasm

@@ -14,7 +14,7 @@ use wasmtime::{Engine, Store};
 use wasmtime_wasi::p2::{add_to_linker_async, WasiCtxBuilder};
 
 use crate::config::metadata::WasmComponentMetadata;
-use crate::host::api::bindings::Operator;
+use crate::host::api::bindings;
 use crate::host::state::State;
 use crate::kubernetes::KubernetesService;
 
@@ -37,8 +37,8 @@ impl WasmInstance {
         }
     }
 
-    pub async fn run(self) -> Result<()> {
-        info!("Starting component: {}", self.metadata.name);
+    pub async fn load(self) -> Result<(bindings::KubeOperator, Store<State>)> {
+        info!("Loading component: {}", self.metadata.name);
 
         debug!(
             "Loading component from file: {}",
@@ -71,25 +71,17 @@ impl WasmInstance {
 
         let mut linker = Linker::new(&self.engine);
         add_to_linker_async(&mut linker)?;
-        crate::host::api::bindings::wasm_operator::operator::parent_api::add_to_linker::<
-            _,
-            HasSelf<_>,
-        >(&mut linker, |ctx: &mut State| ctx)?;
+
+        bindings::KubeOperator::add_to_linker::<_, HasSelf<_>>(&mut linker, |ctx: &mut State| ctx)?;
 
         debug!("Instantiating component: {}", self.metadata.name);
-        let operator = Operator::instantiate_async(&mut store, &component, &linker).await?;
+        let operator =
+            bindings::KubeOperator::instantiate_async(&mut store, &component, &linker).await?;
         debug!(
             "Component instantiated successfully: {}",
             self.metadata.name
         );
 
-        debug!("Running component: {}", self.metadata.name);
-        operator
-            .wasm_operator_operator_child_api()
-            .call_start(&mut store)
-            .await?;
-        debug!("Component run finished: {}", self.metadata.name);
-
-        Ok(())
+        Ok((operator, store))
     }
 }

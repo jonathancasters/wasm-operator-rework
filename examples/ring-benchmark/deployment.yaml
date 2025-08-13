@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wasm-operator
+  labels:
+    app: wasm-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wasm-operator
+  template:
+    metadata:
+      labels:
+        app: wasm-operator
+    spec:
+      containers:
+      - name: wasm-operator
+        image: wasm-operator-rework:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/usr/local/bin/parent", "/config/configuration.yaml"]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+      volumes:
+      - name: config-volume
+        configMap:
+          name: wasm-operator-config
