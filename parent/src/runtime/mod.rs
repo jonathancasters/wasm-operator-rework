@@ -150,6 +150,8 @@ impl WasmRuntime {
         )
         .boxed();
 
+        info!("Watcher started for kind '{}' in namespace '{}'", request.kind, request.namespace);
+
         loop {
             match watcher.next().await {
                 Some(Ok(event)) => {
@@ -160,7 +162,10 @@ impl WasmRuntime {
                         Event::Delete(obj) => {
                             (bindings::local::operator::types::EventType::Deleted, obj)
                         }
-                        _ => continue, // Ignore Restarted events for now
+                        Event::InitApply(obj) => {
+                            (bindings::local::operator::types::EventType::Added, obj)
+                        }
+                        _ => continue, // Ignore Init and InitDone for now
                     };
 
                     self.dispatch_reconcile(&operator_id, event_type, &object)
