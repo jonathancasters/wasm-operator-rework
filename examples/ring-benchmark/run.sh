@@ -21,7 +21,7 @@ cleanup() {
     fi
     echo "✅ Cleanup complete."
 }
-trap cleanup EXIT
+#trap cleanup EXIT
 
 echo "🔧 Checking for Docker..."
 if ! docker info >/dev/null 2>&1; then
@@ -47,6 +47,9 @@ kubectl wait --for=condition=Ready pod --all -n kube-system --timeout=60s || tru
 # 1. Setup
 echo "Creating CRD..."
 kubectl apply -f "$SCRIPT_DIR/crd/rings.example.com.crd.yaml"
+
+echo "Waiting for CRD to be established..."
+kubectl wait --for=condition=established crd/rings.example.com --timeout=60s
 
 echo "Applying RBAC rules..."
 kubectl apply -f "$SCRIPT_DIR/rbac.yaml"
