@@ -37,7 +37,7 @@ category="Go"
 [[commands]]
 name="goFormat"
 command="go fmt ."
-help="format the Go package present in working directory" 
+help="format the Go package present in working directory"
 category="Go"
 
 # RUST
@@ -64,12 +64,12 @@ category="Rust"
 
 # PYTHON
 [[commands]]
-package="python313"
+package="python312"
 name="python"
 help="High-level dynamically-typed programming language"
 category="Python"
 [[commands]]
-package="python313Packages.pip"
+package="python312Packages.pip"
 name="pip3"
 help="Python package manager"
 category="Python"
@@ -91,7 +91,11 @@ package="kubectl"
 name="kubectl"
 help="Kubernetes cli"
 category="Kubernetes"
-
+[[commands]]
+package="kubernetes-helm"
+name="helm"
+help="Kubernetes package manager"
+category="Kubernetes"
 
 # UTILITY
 [[commands]]
@@ -101,11 +105,11 @@ help="Command to produce a depth indented directory listing"
 [[commands]]
 package="shfmt"
 name="shfmt"
-help="Shell parser and formatter" 
+help="Shell parser and formatter"
 [[commands]]
 name="marklint"
 command="markdownlint-cli2 '**/*.md' '#pkg/kube-rs'"
-help="Shell parser and formatter" 
+help="Shell parser and formatter"
 
 [devshell]
 packages = [
@@ -113,7 +117,8 @@ packages = [
 	"markdownlint-cli2",
 	"openssl",
 	"openssl.dev",
-	"pkg-config"
+	"pkg-config",
+	"python312Packages.kubernetes"
 ]
 
 # Needed to be able to build the application with cargo (https)
