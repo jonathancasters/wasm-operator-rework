@@ -1,0 +1,27 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: parent-operator-role
+rules:
+- apiGroups: [""]
+  resources: ["namespaces", "configmaps"]
+  verbs: ["create", "get", "watch", "list", "delete", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["create", "get", "watch", "list", "delete", "update", "patch"]
+- apiGroups: ["ring.benchmark.com"]
+  resources: ["testresources"]
+  verbs: ["create", "get", "watch", "list", "delete", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: parent-operator-binding
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: default # This will be the namespace of the parent operator itself
+roleRef:
+  kind: ClusterRole
+  name: parent-operator-role
+  apiGroup: rbac.authorization.k8s.io

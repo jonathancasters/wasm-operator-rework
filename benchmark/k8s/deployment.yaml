@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parent-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parent-operator
+  template:
+    metadata:
+      labels:
+        app: parent-operator
+    spec:
+      containers:
+      - name: parent-operator
+        image: wasm-operator-rework:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/usr/local/bin/parent", "--debug", "/config/configuration.yaml"]
+        env:
+        - name: RUST_LOG
+          value: info
+        volumeMounts:
+        - name: parent-config
+          mountPath: /config
+      volumes:
+      - name: parent-config
+        configMap:
+          name: parent-config

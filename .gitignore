@@ -1,4 +1,5 @@
 target
+build
 temp
 *.wasm
 .idea
@@ -8,3 +9,4 @@ tested-operators/
 .direnv/
 .envrc
 .vscode/
+/benchmark/results/
