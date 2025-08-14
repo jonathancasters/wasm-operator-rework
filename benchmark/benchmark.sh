@@ -9,7 +9,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 # --- Configuration ---
 OPERATOR_COUNTS="10"
 RUNS_PER_COUNT=1
-OPERATOR_TYPE="mixed" # mixed, go, or rust
+OPERATOR_TYPE=${OPERATOR_TYPE:-"mixed"} # mixed, go, or rust
 ACTIVE_DURATION=60 # 1 minute for testing
 IDLE_DURATION=30   # 30 seconds for testing
 OUTPUT_DIR="${SCRIPT_DIR}/results"
@@ -27,65 +27,61 @@ usage() {
 
 # Function to handle cleanup
 cleanup() {
-    echo "--- Cleaning up kind cluster ---"
+    echo "🧹 Cleaning up kind cluster..."
     kind delete cluster --name "${CLUSTER_NAME}" || true
-    echo "--- Cleanup complete ---"
+    echo "✅ Cleanup complete."
 }
 
 # Function to check for prerequisites
 check_prereqs() {
-    echo "--- Checking for prerequisites ---"
+    echo "🔎 Checking for prerequisites..."
     for cmd in kind kubectl docker helm python3; do
         if ! command -v "$cmd" &> /dev/null; then
-            echo "Error: $cmd is not installed." >&2
+            echo "❌ Error: $cmd is not installed." >&2
             exit 1
         fi
     done
-    echo "All system prerequisites are installed."
+    echo "✅ All system prerequisites are installed."
 }
 
 # Function to set up and manage the Python virtual environment
 setup_python_venv() {
-    echo "--- Setting up Python virtual environment in ${VENV_DIR} ---"
+    echo "🐍 Setting up Python virtual environment..."
     if [ ! -d "${VENV_DIR}" ]; then
-        echo "Creating virtual environment..."
         python3 -m venv "${VENV_DIR}"
     fi
     VENV_PYTHON="${VENV_DIR}/bin/python3"
-    echo "Upgrading pip..."
-    "$VENV_PYTHON" -m pip install --upgrade pip > /dev/null
-    echo "Installing dependencies from requirements.txt..."
+    "$VENV_PYTHON" -m pip install --index-url https://pypi.org/simple --upgrade pip > /dev/null
     "$VENV_PYTHON" -m pip install --index-url https://pypi.org/simple -r "${SCRIPT_DIR}/requirements.txt"
-    echo "--- Python virtual environment is ready ---"
+    echo "✅ Python virtual environment is ready."
 }
 
 # Proactively clean up resources from previous runs to ensure idempotency
 pre_run_cleanup() {
-    echo "--- Performing pre-run cleanup of Kubernetes resources ---"
+    echo "🧹 Performing pre-run cleanup of Kubernetes resources..."
     kubectl delete -f "${K8S_DIR}/deployment.yaml" --ignore-not-found=true
     kubectl delete configmap parent-config --ignore-not-found=true
     kubectl delete -f "${K8S_DIR}/rbac.yaml" --ignore-not-found=true
     kubectl delete -f "${K8S_DIR}/testresource-crd.yaml" --ignore-not-found=true
     kubectl delete ns -l benchmark-ns=true --ignore-not-found=true
-    echo "--- Pre-run cleanup complete ---"
 }
 
 # Function to set up the kind cluster
 setup_cluster() {
-    echo "--- Setting up kind cluster ---"
+    echo "📦 Setting up kind cluster..."
     if ! kubectl cluster-info --context "kind-${CLUSTER_NAME}" >/dev/null 2>&1;
  then
-        echo "Cluster '${CLUSTER_NAME}' not found or not responsive. Deleting remnants and creating a new one..."
+        echo "Cluster '${CLUSTER_NAME}' not found, creating a new one..."
         kind delete cluster --name "${CLUSTER_NAME}" || true
         kind create cluster --name "${CLUSTER_NAME}"
     else
-        echo "kind cluster '${CLUSTER_NAME}' is already running and responsive."
+        echo "✅ kind cluster '${CLUSTER_NAME}' is already running."
     fi
 }
 
 # Function to deploy Prometheus and Grafana using Helm
 deploy_prometheus() {
-    echo "--- Deploying kube-prometheus-stack ---"
+    echo "📊 Deploying kube-prometheus-stack..."
     if ! helm status kube-prometheus-stack -n monitoring >/dev/null 2>&1;
  then
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -94,37 +90,37 @@ deploy_prometheus() {
             --create-namespace \
             --namespace monitoring
     else
-        echo "kube-prometheus-stack is already deployed."
+        echo "✅ kube-prometheus-stack is already deployed."
     fi
 
-    echo "Waiting for Prometheus and Grafana pods to be ready..."
+    echo "⏳ Waiting for Prometheus and Grafana pods to be ready..."
     kubectl wait --for=condition=Ready pod -n monitoring -l app.kubernetes.io/name=grafana --timeout=300s
     kubectl wait --for=condition=Ready pod -n monitoring -l app.kubernetes.io/name=prometheus --timeout=300s
-    echo "Prometheus and Grafana are ready."
+    echo "✅ Prometheus and Grafana are ready."
 }
 
 # Function to build Wasm modules and the parent operator Docker image
 build_and_load_images() {
-    echo "--- Building and loading images ---"
-    echo "Creating central build artifact directory..."
+    echo "🛠️ Building and loading images..."
     mkdir -p "${SCRIPT_DIR}/build"
-    echo "Building Rust operator..."
+    echo "    Building Rust operator..."
     (cd "${SCRIPT_DIR}/operators/rust-operator" && ./compile.sh)
     cp "${SCRIPT_DIR}/operators/rust-operator/target/ring-operator-rust.wasm" "${SCRIPT_DIR}/build/rust-operator.wasm"
-    echo "Building Go operator..."
+    echo "    Building Go operator..."
     (cd "${SCRIPT_DIR}/operators/go-operator" && ./compile.sh)
     cp "${SCRIPT_DIR}/operators/go-operator/target/ring-operator-go.wasm" "${SCRIPT_DIR}/build/go-operator.wasm"
-    echo "Building parent operator image..."
+    echo "    Building parent operator image..."
     docker build -t wasm-operator-rework:latest -f "${SCRIPT_DIR}/../Dockerfile" "${SCRIPT_DIR}/.."
-    echo "Loading image into kind..."
+    echo "    Loading image into kind..."
     kind load docker-image wasm-operator-rework:latest --name "${CLUSTER_NAME}"
+    echo "✅ Images built and loaded."
 }
 
 # Function to dynamically generate and deploy the parent operator's config
 deploy_parent_operator_config() {
     local count=$1
     local op_type=$2
-    echo "--- Generating and deploying parent operator config for ${count} operators of type '${op_type}' ---"
+    echo "⚙️ Generating and deploying config for ${count} operators (${op_type})..."
 
     CONFIG_YAML="apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: parent-config\ndata:\n  configuration.yaml: |"
 
@@ -137,14 +133,11 @@ deploy_parent_operator_config() {
                 else
                     wasm_module="rust-operator.wasm"
                 fi
-                ;;
-            go)
+                ;;            go)
                 wasm_module="go-operator.wasm"
-                ;;
-            rust)
+                ;;            rust)
                 wasm_module="rust-operator.wasm"
-                ;;
-        esac
+                ;;        esac
 
         if [ "$i" -eq "${count}" ]; then
             ACTION_NAMESPACE="ns-final"
@@ -164,11 +157,31 @@ deploy_parent_operator_config() {
     echo -e "${CONFIG_YAML}" | kubectl apply -f -
 }
 
+start_port_forward() {
+    echo "🔗 Starting port-forward to Prometheus..."
+    kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 >/dev/null 2>&1 &
+    PF_PID=$!
+    # Wait for the port-forward to be ready
+    sleep 5
+}
+
+stop_port_forward() {
+    echo "🔗 Stopping port-forward to Prometheus..."
+    kill $PF_PID
+}
+
 # Function to run a single test iteration
 run_test_iteration() {
     local count=$1
     local run=$2
-    echo "--- Deploying for ${count} operators, run #${run} ---"
+    local operator_type=$3
+    
+    local latency_file="${OUTPUT_DIR}/latency.csv"
+    local memory_file="${OUTPUT_DIR}/memory.csv"
+
+    mkdir -p "${OUTPUT_DIR}"
+
+    echo "🚀 Deploying for ${count} operators, run #${run}..."
 
     for i in $(seq 1 "${count}"); do
         kubectl create ns "ns-${i}" || true
@@ -177,47 +190,48 @@ run_test_iteration() {
     kubectl create ns "ns-final" || true
     kubectl label ns "ns-final" benchmark-ns=true || true
 
-    echo "Applying Kubernetes manifests from ${K8S_DIR}..."
     kubectl apply -f "${K8S_DIR}/testresource-crd.yaml"
     kubectl apply -f "${K8S_DIR}/rbac.yaml"
 
-    deploy_parent_operator_config "${count}" "${OPERATOR_TYPE}"
+    deploy_parent_operator_config "${count}" "${operator_type}"
 
     kubectl apply -f "${K8S_DIR}/deployment.yaml"
 
-    echo "Waiting for parent operator to be ready..."
+    echo "⏳ Waiting for parent operator to be ready..."
     kubectl wait --for=condition=Available deployment/parent-operator --timeout=120s
 
-    echo "--- Executing test driver for ${count} operators, run #${run} ---"
-    "${VENV_DIR}/bin/python3" "${SCRIPT_DIR}/test_driver.py" --operator-count "${count}" --run-number "${run}" --output-dir "${OUTPUT_DIR}" --active-duration "${ACTIVE_DURATION}" --idle-duration "${IDLE_DURATION}"
+    start_port_forward
+    trap stop_port_forward RETURN
+
+    # Run the test driver
+    echo "🐍 Executing test driver..."
+    "${VENV_DIR}/bin/python3" "${SCRIPT_DIR}/test_driver.py" \
+        --operator-count "${count}" \
+        --run-number "${run}" \
+        --latency-file "${latency_file}" \
+        --memory-file "${memory_file}" \
+        --active-duration "${ACTIVE_DURATION}" \
+        --idle-duration "${IDLE_DURATION}"
+
+    stop_port_forward
 }
 
-# Function to collect metrics from Prometheus
-collect_metrics() {
-    local count=$1
-    local run=$2
-    echo "--- Collecting metrics for ${count} operators, run #${run} ---"
-    mkdir -p "${OUTPUT_DIR}"
-    echo "Port-forwarding to Prometheus..."
-    kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 &
-    PROMETHEUS_PID=$!
-    sleep 5
-    PROMQL_QUERY='container_memory_working_set_bytes{container="parent-operator"}'
-    echo "Querying Prometheus..."
-    curl -s -g "http://localhost:9090/api/v1/query?query=${PROMQL_QUERY}" > "${OUTPUT_DIR}/memory_N${count}_run${run}.json"
-    echo "Stopping port-forward..."
-    kill "${PROMETHEUS_PID}"
-}
+
+
+
+
+
 
 # Function to clean up resources after a test iteration
 cleanup_iteration() {
-    echo "--- Cleaning up iteration resources ---"
+    echo "🧹 Cleaning up iteration resources..."
     kubectl delete -f "${K8S_DIR}/deployment.yaml" --ignore-not-found=true
     kubectl delete configmap parent-config --ignore-not-found=true
     kubectl delete -f "${K8S_DIR}/rbac.yaml" --ignore-not-found=true
     kubectl delete -f "${K8S_DIR}/testresource-crd.yaml" --ignore-not-found=true
     kubectl delete ns -l benchmark-ns=true --ignore-not-found=true
 }
+
 
 # --- Main Execution ---
 trap 'cleanup' EXIT
@@ -244,12 +258,11 @@ build_and_load_images
 
 for count in ${OPERATOR_COUNTS}; do
     for run in $(seq 1 "${RUNS_PER_COUNT}"); do
-        echo "--- Running test for ${count} operators, run #${run} ---"
-        run_test_iteration "${count}" "${run}"
-        collect_metrics "${count}" "${run}"
+        echo "--- 🚀 Running test for ${count} operators, run #${run}, type '${OPERATOR_TYPE}' ---"
+        run_test_iteration "${count}" "${run}" "${OPERATOR_TYPE}"
         cleanup_iteration
-        echo "--- Iteration for ${count} operators, run #${run} complete ---"
+        echo "--- ✅ Iteration for ${count} operators, run #${run} complete ---"
     done
 done
 
-echo "--- Benchmark suite complete ---"
+echo "--- 🎉 Benchmark suite complete! ---"

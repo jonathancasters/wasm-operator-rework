@@ -118,7 +118,12 @@ packages = [
 	"openssl",
 	"openssl.dev",
 	"pkg-config",
-	"python312Packages.kubernetes"
+	"python312Packages.kubernetes",
+	"python312Packages.seaborn",
+	"python312Packages.pandas",
+	"python312Packages.scikit-learn",
+	"python312Packages.numpy",
+	"python312Packages.matplotlib",
 ]
 
 # Needed to be able to build the application with cargo (https)
