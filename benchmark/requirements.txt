@@ -1,0 +1,7 @@
+kubernetes~=33.1.0
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+tqdm

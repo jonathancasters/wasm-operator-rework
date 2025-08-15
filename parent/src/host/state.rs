@@ -8,10 +8,9 @@
 
 use std::sync::Arc;
 
+use crate::kubernetes::KubernetesService;
 use wasmtime::component::{HasData, ResourceTable};
 use wasmtime_wasi::p2::{IoView, WasiCtx, WasiView};
-
-use crate::kubernetes::KubernetesService;
 
 pub struct State {
     pub wasi_ctx: WasiCtx,

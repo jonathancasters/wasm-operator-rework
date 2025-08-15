@@ -1,0 +1,204 @@
+import argparse
+import csv
+import os
+import time
+import logging
+import requests
+from tqdm import tqdm
+
+from kubernetes import client, config, watch
+
+PROMETHEUS_URL = "http://localhost:9090"
+
+
+def get_memory_usage():
+    """Queries Prometheus for memory usage of the parent-operator container."""
+    query = 'sum(container_memory_working_set_bytes{namespace="default",container="parent-operator"})'
+    try:
+        response = requests.get(f"{PROMETHEUS_URL}/api/v1/query", params={"query": query})
+        response.raise_for_status()
+        result = response.json()['data']['result']
+        if result:
+            return int(result[0]['value'][1])
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error querying Prometheus: {e}")
+    except (KeyError, IndexError):
+        logging.warning("Could not parse Prometheus response.")
+    return 0
+
+
+def write_header_if_needed(file_path, headers):
+    """Writes the header to a CSV file if it doesn't exist or is empty."""
+    if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+        with open(file_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(headers)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run a benchmark test for a chain of operators.")
+    parser.add_argument("--operator-count", type=int, required=True, help="The number of operators in the ring.")
+    parser.add_argument("--active-duration", type=int, required=True, help="Duration of the active phase in seconds.")
+    parser.add_argument("--idle-duration", type=int, required=True, help="Duration of the idle phase in seconds.")
+    parser.add_argument("--latency-file", type=str, required=True, help="File to save the latency results.")
+    parser.add_argument("--memory-file", type=str, required=True, help="File to save the memory results.")
+    parser.add_argument("--run-number", type=int, required=True, help="The current run number.")
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s', datefmt='%H:%M:%S')
+
+    logging.info(f"🐍 Test Driver Started: Operators={args.operator_count}, Run={args.run_number}")
+
+    # Write headers if needed
+    write_header_if_needed(args.latency_file, ["operator_count", "run_number", "latency_ms"])
+    write_header_if_needed(args.memory_file, ["operator_count", "run_number", "phase", "timestamp", "memory_bytes"])
+
+    # Load Kubernetes configuration
+    try:
+        config.load_kube_config()
+    except config.ConfigException:
+        config.load_incluster_config()
+
+    api = client.CustomObjectsApi()
+    crd_api = client.ApiextensionsV1Api()
+    apps_v1 = client.AppsV1Api()
+
+    # Define the custom resource details
+    CRD_GROUP = "ring.benchmark.com"
+    CRD_VERSION = "v1"
+    CRD_PLURAL = "testresources"
+    CRD_NAME = f"{CRD_PLURAL}.{CRD_GROUP}"
+
+    # Wait for the CRD to be established
+    logging.info(f"⏳ Waiting for CRD '{CRD_NAME}' to be established...")
+    while True:
+        try:
+            crd = crd_api.read_custom_resource_definition(name=CRD_NAME)
+            if any(c.status == 'True' and c.type == 'Established' for c in crd.status.conditions):
+                logging.info("✅ CRD is established.")
+                break
+        except client.ApiException as e:
+            if e.status == 404:
+                pass  # Not found yet
+            else:
+                raise
+        time.sleep(1)
+
+    # Wait for the operator deployment to be ready
+    OPERATOR_DEPLOYMENT_NAME = "parent-operator"
+    OPERATOR_NAMESPACE = "default"
+    logging.info(f"⏳ Waiting for deployment '{OPERATOR_DEPLOYMENT_NAME}' to be ready...")
+    while True:
+        try:
+            deployment = apps_v1.read_namespaced_deployment_status(name=OPERATOR_DEPLOYMENT_NAME,
+                                                                   namespace=OPERATOR_NAMESPACE)
+            status = deployment.status
+            if status.ready_replicas is not None and status.ready_replicas == deployment.spec.replicas:
+                logging.info(
+                    f"✅ Deployment '{OPERATOR_DEPLOYMENT_NAME}' is ready with {status.ready_replicas} replica(s).")
+                break
+        except client.ApiException as e:
+            if e.status == 404:
+                logging.warning(f"Deployment '{OPERATOR_DEPLOYMENT_NAME}' not found. Waiting...")
+            else:
+                logging.error(f"Error checking deployment status: {e}")
+        time.sleep(2)  # Poll every 2 seconds
+
+    # Create the initial resource in ns-1 to kick things off
+    initial_resource_name = "the-resource"
+    initial_namespace = "ns-1"
+    final_namespace = "ns-final"
+
+    logging.info(f"🎯 Creating initial TestResource in namespace '{initial_namespace}'...")
+    try:
+        api.create_namespaced_custom_object(
+            group=CRD_GROUP,
+            version=CRD_VERSION,
+            namespace=initial_namespace,
+            plural=CRD_PLURAL,
+            body={
+                "apiVersion": f"{CRD_GROUP}/{CRD_VERSION}",
+                "kind": "TestResource",
+                "metadata": {"name": initial_resource_name},
+                "spec": {"nonce": "initial"}
+            }
+        )
+    except client.ApiException as e:
+        if e.status == 409:  # Conflict, already exists
+            logging.warning(f"Initial resource '{initial_resource_name}' already exists. Proceeding.")
+        else:
+            raise  # Re-raise other exceptions
+
+    # --- Active Phase ---
+    logging.info("⏱️ Starting Active Phase...")
+    latencies = []
+    with tqdm(total=args.active_duration, desc="Active Phase", unit="s") as pbar:
+        start_time = time.time()
+        while time.time() < start_time + args.active_duration:
+            nonce = str(time.time_ns())
+
+            w = watch.Watch()
+            stream = w.stream(
+                api.list_namespaced_custom_object,
+                group=CRD_GROUP,
+                version=CRD_VERSION,
+                namespace=final_namespace,
+                plural=CRD_PLURAL,
+                field_selector=f"metadata.name={initial_resource_name}",
+                timeout_seconds=10
+            )
+
+            trigger_start_time = time.perf_counter()
+            api.patch_namespaced_custom_object(
+                group=CRD_GROUP,
+                version=CRD_VERSION,
+                namespace=initial_namespace,
+                plural=CRD_PLURAL,
+                name=initial_resource_name,
+                body={"spec": {"nonce": nonce}}
+            )
+
+            for event in stream:
+                if event['type'] in ['ADDED', 'MODIFIED']:
+                    resource = event['object']
+                    if resource.get('spec', {}).get('nonce') == nonce:
+                        end_time = time.perf_counter()
+                        latency_ms = (end_time - trigger_start_time) * 1000
+                        latencies.append(latency_ms)
+                        pbar.set_postfix_str(f"Runs: {len(latencies)}, Latency: {latency_ms:.2f}ms")
+                        w.stop()
+                        break
+            
+            pbar.n = int(time.time() - start_time)
+            pbar.refresh()
+            time.sleep(0.1)
+
+    logging.info(f"--- Active Phase Complete. Total runs: {len(latencies)} ---")
+    active_memory = get_memory_usage()
+
+    # --- Idle Phase ---
+    logging.info("--- Starting Idle Phase...")
+    logging.info(f"😴 Sleeping for {args.idle_duration} seconds...")
+    time.sleep(args.idle_duration)
+
+    logging.info("--- Idle Phase Complete ---")
+    idle_memory = get_memory_usage()
+
+    # --- Data Output ---
+    logging.info(f"📝 Writing {len(latencies)} latency measurements to {args.latency_file}")
+    with open(args.latency_file, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        for latency in latencies:
+            writer.writerow([args.operator_count, args.run_number, latency])
+
+    logging.info(f"📝 Writing memory measurements to {args.memory_file}")
+    with open(args.memory_file, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow([args.operator_count, args.run_number, "active", int(time.time()), active_memory])
+        writer.writerow([args.operator_count, args.run_number, "idle", int(time.time()), idle_memory])
+
+    logging.info("🎉 Test Driver Finished Successfully!")
+
+
+if __name__ == "__main__":
+    main()

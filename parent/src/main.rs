@@ -31,11 +31,18 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Create a tokio runtime and run the async code
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(async {
+    let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    let local = tokio::task::LocalSet::new();
+    local.block_on(&tokio_runtime, async {
         let k8s_service = Arc::new(KubernetesService::new().await?);
-        let runtime = Arc::new(WasmRuntime::new(k8s_service.clone())?);
-        runtime.run_components(components_metadata).await
+        let wasm_runtime = Arc::new(WasmRuntime::new(k8s_service.clone())?);
+        // The future inside block_on needs to return a Result.
+        // After run_components (which returns a Result) is awaited, we wrap the
+        // successful `()` value in an `Ok` to match the expected return type.
+        wasm_runtime.run_components(components_metadata).await?;
+        Ok::<(), anyhow::Error>(())
     })?;
 
     info!("All components finished successfully.");
@@ -54,7 +61,7 @@ fn setup_logging(debug: bool) {
     tracing::subscriber::set_global_default(
         FmtSubscriber::builder().with_max_level(level).finish(),
     )
-    .expect("setting default subscriber failed");
+        .expect("setting default subscriber failed");
 
     if debug {
         debug!("Debug logging enabled.");
