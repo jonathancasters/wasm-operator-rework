@@ -75,7 +75,13 @@ impl WasmRuntime {
         self: Arc<Self>,
         components_metadata: Vec<WasmComponentMetadata>,
     ) -> Result<()> {
+        // Stagger the initialization of each component to avoid a thundering herd of requests
+        // to the Kubernetes API server.
+        let stagger_delay = Duration::from_millis(125);
+
         for metadata in components_metadata {
+            tokio::time::sleep(stagger_delay).await;
+
             let operator_id = metadata.name.clone();
 
             let instance = WasmInstance::new(

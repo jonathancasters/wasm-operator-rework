@@ -16,12 +16,14 @@ OUTPUT_DIR="${SCRIPT_DIR}/results"
 CLUSTER_NAME="benchmark"
 VENV_DIR="${SCRIPT_DIR}/.venv" # Use .venv for convention
 K8S_DIR="${SCRIPT_DIR}/k8s"
+SKIP_SETUP=false
+RUN_NUMBER_OVERRIDE=""
 
 # --- Functions ---
 
 # Function to print usage
 usage() {
-    echo "Usage: $0 [--operator-counts \"10 20 30\"] [--runs-per-count 5] [--operator-type <mixed|go|rust>] [--active-duration 420] [--idle-duration 120] [--output-dir ./results]"
+    echo "Usage: $0 [--operator-counts \"10 20 30\"] [--runs-per-count 5] [--operator-type <mixed|go|rust>] [--active-duration 420] [--idle-duration 120] [--output-dir ./results] [--skip-setup]"
     exit 1
 }
 
@@ -51,8 +53,8 @@ setup_python_venv() {
         python3 -m venv "${VENV_DIR}"
     fi
     VENV_PYTHON="${VENV_DIR}/bin/python3"
-    "$VENV_PYTHON" -m pip install --index-url https://pypi.org/simple --upgrade pip > /dev/null
-    "$VENV_PYTHON" -m pip install --index-url https://pypi.org/simple -r "${SCRIPT_DIR}/requirements.txt"
+    "$VENV_PYTHON" -m pip install --index-url https://pypi.org/simple --quiet --upgrade pip > /dev/null
+    "$VENV_PYTHON" -m pip install --index-url https://pypi.org/simple --quiet -r "${SCRIPT_DIR}/requirements.txt"
     echo "✅ Python virtual environment is ready."
 }
 
@@ -244,6 +246,8 @@ while [[ "$#" -gt 0 ]]; do
         --active-duration) ACTIVE_DURATION="$2"; shift ;;
         --idle-duration) IDLE_DURATION="$2"; shift ;;
         --output-dir) OUTPUT_DIR="$2"; shift ;;
+        --skip-setup) SKIP_SETUP=false ;;
+        --run-number) RUN_NUMBER_OVERRIDE="$2"; shift ;;
         *) usage ;;
     esac
     shift
@@ -251,13 +255,20 @@ done
 
 check_prereqs
 setup_python_venv
-setup_cluster
-pre_run_cleanup
-deploy_prometheus
-build_and_load_images
+if [ "$SKIP_SETUP" = "false" ]; then
+    setup_cluster
+    deploy_prometheus
+    build_and_load_images
+fi
 
 for count in ${OPERATOR_COUNTS}; do
-    for run in $(seq 1 "${RUNS_PER_COUNT}"); do
+    if [ -n "$RUN_NUMBER_OVERRIDE" ]; then
+        runs_to_execute="$RUN_NUMBER_OVERRIDE"
+    else
+        runs_to_execute=$(seq 1 "${RUNS_PER_COUNT}")
+    fi
+
+    for run in ${runs_to_execute}; do
         echo "--- 🚀 Running test for ${count} operators, run #${run}, type '${OPERATOR_TYPE}' ---"
         run_test_iteration "${count}" "${run}" "${OPERATOR_TYPE}"
         cleanup_iteration
