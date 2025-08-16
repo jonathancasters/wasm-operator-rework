@@ -1,0 +1,22 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ring-operator-bare-metal
+  labels:
+    app: ring-operator-bare-metal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ring-operator-bare-metal
+  template:
+    metadata:
+      labels:
+        app: ring-operator-bare-metal
+    spec:
+      serviceAccountName: ring-operator-bare-metal-sa
+      containers:
+      - name: ring-operator-bare-metal
+        image: your-registry/ring-operator-bare-metal:latest # <-- IMPORTANT: Replace with your image repository
+        imagePullPolicy: Always

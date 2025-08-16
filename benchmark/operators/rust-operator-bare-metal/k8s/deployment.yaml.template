@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ring-operator-bare-metal-{{OPERATOR_INDEX}}
+  namespace: operator-{{OPERATOR_INDEX}}
+  labels:
+    app: ring-operator-bare-metal-{{OPERATOR_INDEX}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ring-operator-bare-metal-{{OPERATOR_INDEX}}
+  template:
+    metadata:
+      labels:
+        app: ring-operator-bare-metal-{{OPERATOR_INDEX}}
+    spec:
+      serviceAccountName: ring-operator-bare-metal-sa
+      containers:
+      - name: ring-operator-bare-metal
+        image: ring-operator-bare-metal:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: OPERATOR_NAME
+          value: "operator-{{OPERATOR_INDEX}}"
+        - name: OPERATOR_NAMESPACE
+          value: "operator-{{OPERATOR_INDEX}}"

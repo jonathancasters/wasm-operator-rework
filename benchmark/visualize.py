@@ -11,7 +11,7 @@ def load_data(root_dir):
     """
     Loads all latency and memory data from the structured subdirectories.
     """
-    scenarios = ['mixed', 'rust', 'go']
+    scenarios = ['mixed', 'rust', 'go', 'rust-bare-metal', 'go-bare-metal']
     latency_dfs = []
     memory_dfs = []
 
@@ -155,11 +155,15 @@ def plot_language_impact(latency_df, memory_agg, results_dir):
         plt.figure(figsize=(10, 6))
         sns.set_theme(style="whitegrid")
 
-        lang_data = memory_agg[memory_agg['scenario'].isin(['rust', 'go']) & (memory_agg['phase'] == 'active')]
+        lang_data = memory_agg[memory_agg['scenario'].isin(['rust', 'go', 'rust-bare-metal', 'go-bare-metal']) & (memory_agg['phase'] == 'active')]
 
         sns.regplot(x='operator_count', y='memory_mib', data=lang_data[lang_data['scenario'] == 'rust'], label='Rust',
                     n_boot=1000)
         sns.regplot(x='operator_count', y='memory_mib', data=lang_data[lang_data['scenario'] == 'go'], label='Go',
+                    n_boot=1000)
+        sns.regplot(x='operator_count', y='memory_mib', data=lang_data[lang_data['scenario'] == 'rust-bare-metal'], label='Rust (Bare Metal)',
+                    n_boot=1000)
+        sns.regplot(x='operator_count', y='memory_mib', data=lang_data[lang_data['scenario'] == 'go-bare-metal'], label='Go (Bare Metal)',
                     n_boot=1000)
 
         plt.title('Framework Memory Usage by Operator Language (Active Phase)')
@@ -175,7 +179,7 @@ def plot_language_impact(latency_df, memory_agg, results_dir):
         plt.figure(figsize=(10, 6))
         sns.set_theme(style="whitegrid")
 
-        lang_data = latency_df[latency_df['scenario'].isin(['rust', 'go'])]
+        lang_data = latency_df[latency_df['scenario'].isin(['rust', 'go', 'rust-bare-metal', 'go-bare-metal'])]
 
         sns.lineplot(x='operator_count', y='latency_s', data=lang_data, hue='scenario', style='scenario', markers=True,
                      dashes=False, errorbar=('ci', 95))
@@ -209,6 +213,10 @@ def plot_comprehensive_scalability(latency_df, memory_agg, results_dir):
                     label='Rust-Active', n_boot=1000)
         sns.regplot(x='operator_count', y='memory_mib', data=active_data[active_data['scenario'] == 'go'],
                     label='Go-Active', n_boot=1000)
+        sns.regplot(x='operator_count', y='memory_mib', data=active_data[active_data['scenario'] == 'rust-bare-metal'],
+                    label='Rust-Bare-Metal-Active', n_boot=1000)
+        sns.regplot(x='operator_count', y='memory_mib', data=active_data[active_data['scenario'] == 'go-bare-metal'],
+                    label='Go-Bare-Metal-Active', n_boot=1000)
 
         plt.title('Comprehensive Memory Scalability Analysis (Active Phase)')
         plt.xlabel('Number of Operators')

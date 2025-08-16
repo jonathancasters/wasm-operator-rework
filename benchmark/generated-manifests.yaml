@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: operator-1
+---
+apiVersion: "apiextensions.k8s.io/v1"
+kind: "CustomResourceDefinition"
+metadata:
+  name: "rings.example.com"
+spec:
+  group: "example.com"
+  names:
+    kind: "Ring"
+    plural: "rings"
+    singular: "ring"
+    shortNames:
+    - "rg"
+  scope: "Namespaced"
+  versions:
+  - name: "v1"
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: "object"
+        properties:
+          spec:
+            type: "object"
+            properties:
+              replicas:
+                type: "integer"
+              nonce:
+                type: "string"
+              chain:
+                type: "array"
+                items:
+                  type: "string"
+              hop:
+                type: "integer"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ring-operator-bare-metal-role
+rules:
+- apiGroups: ["example.com"]
+  resources: ["rings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["create"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ring-operator-bare-metal-sa
+  namespace: operator-1
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ring-operator-bare-metal-rb-1
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ring-operator-bare-metal-role
+subjects:
+- kind: ServiceAccount
+  name: ring-operator-bare-metal-sa
+  namespace: operator-1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ring-operator-bare-metal-1
+  namespace: operator-1
+  labels:
+    app: ring-operator-bare-metal-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ring-operator-bare-metal-1
+  template:
+    metadata:
+      labels:
+        app: ring-operator-bare-metal-1
+    spec:
+      serviceAccountName: ring-operator-bare-metal-sa
+      containers:
+      - name: ring-operator-bare-metal
+        image: ring-operator-bare-metal:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: OPERATOR_NAME
+          value: "operator-1"
+        - name: OPERATOR_NAMESPACE
+          value: "operator-1"
+---
